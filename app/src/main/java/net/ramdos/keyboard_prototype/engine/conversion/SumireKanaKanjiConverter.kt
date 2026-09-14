@@ -26,10 +26,14 @@ class SumireKanaKanjiConverter private constructor(
     private val tokens: TokenArray,
     private val connections: ConnectionMatrix,
     private val tokenizer: Tokenizer,
+    lexiconConfig: SumireLexiconConfig,
 ) : KanaKanjiConverter {
     private val graphBuilder = GraphBuilder()
     private val pathFinder = FindPath()
-    private var closed = false
+    @Volatile private var closed = false
+    override val readingLexicon = SumireReadingLexicon(yomi, tokens, connections, lexiconConfig) {
+        check(!closed) { "Kana-kanji converter is closed" }
+    }
     private val conversionCache = object : LinkedHashMap<String, List<String>>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<String>>): Boolean =
             size > 64
@@ -78,11 +82,17 @@ class SumireKanaKanjiConverter private constructor(
         // This is the pinned v1.7.252 matrix's uncompressed byte count (2672² shorts).
         private const val CONNECTION_MATRIX_BYTES = 14_279_168L
 
-        fun open(context: Context): SumireKanaKanjiConverter =
-            fromAssets { name -> context.applicationContext.assets.open("$ASSET_ROOT/$name") }
+        fun open(
+            context: Context,
+            lexiconConfig: SumireLexiconConfig = SumireLexiconConfig(),
+        ): SumireKanaKanjiConverter =
+            fromAssets(lexiconConfig) { name -> context.applicationContext.assets.open("$ASSET_ROOT/$name") }
 
         /** Shared byte-loading route used by Android and real-dictionary JVM integration tests. */
-        internal fun fromAssets(openAsset: (String) -> InputStream): SumireKanaKanjiConverter {
+        internal fun fromAssets(
+            lexiconConfig: SumireLexiconConfig = SumireLexiconConfig(),
+            openAsset: (String) -> InputStream,
+        ): SumireKanaKanjiConverter {
             fun <T> zippedObject(name: String, read: (ObjectInputStream) -> T): T =
                 openAsset("$name.zip").use { raw ->
                     ZipInputStream(BufferedInputStream(raw)).use { zip ->
@@ -106,7 +116,7 @@ class SumireKanaKanjiConverter private constructor(
                     ConnectionMatrix.read(BufferedInputStream(zip), CONNECTION_MATRIX_BYTES)
                 }
             }
-            return SumireKanaKanjiConverter(yomi, tango, tokens, connections, Tokenizer())
+            return SumireKanaKanjiConverter(yomi, tango, tokens, connections, Tokenizer(), lexiconConfig)
         }
 
         internal fun hiragana(text: String): String = text.map {

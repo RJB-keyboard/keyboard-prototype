@@ -42,6 +42,17 @@ open class LOUDS {
         return -1
     }
 
+    /** Advance a known trie prefix without allocating or re-reading its characters. */
+    fun advancePrefix(nodeIndex: Int, letter: Char): Int {
+        require(nodeIndex >= 0 && (nodeIndex == 0 || lbs[nodeIndex]))
+        return traverse(nodeIndex, letter)
+    }
+
+    /** A valid prefix is not necessarily a complete dictionary reading. */
+    fun isTerminal(nodeIndex: Int): Boolean = nodeIndex >= 0 && leaves[nodeIndex]
+
+    fun hasContinuation(nodeIndex: Int): Boolean = nodeIndex >= 0 && firstChild(nodeIndex) >= 0
+
     fun commonPrefixSearch(str: String): List<String> {
         val result = mutableListOf<String>()
         var position = 0
