@@ -33,12 +33,21 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     init {
         orientation = VERTICAL
         setBackgroundColor(Color.rgb(232, 236, 241))
-        // Reserve system navigation / cutout space so IME controls never cover keys.
+        // The IME switcher uses captionBar insets on recent Android versions.
+        // Keep a dedicated system-control band even before insets arrive.
+        val minimumSystemBand = (48 * resources.displayMetrics.density).toInt()
+        val systemKeyGap = (8 * resources.displayMetrics.density).toInt()
+        setPadding(0, 0, 0, minimumSystemBand + systemKeyGap)
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
-            val safeArea = insets.getInsets(
-                WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.displayCutout(),
+            val systemTypes = WindowInsetsCompat.Type.navigationBars() or
+                WindowInsetsCompat.Type.captionBar() or WindowInsetsCompat.Type.displayCutout()
+            val safeArea = androidx.core.graphics.Insets.max(
+                insets.getInsets(systemTypes), insets.getInsetsIgnoringVisibility(systemTypes),
             )
-            view.setPadding(safeArea.left, 0, safeArea.right, safeArea.bottom)
+            view.setPadding(
+                safeArea.left, safeArea.top, safeArea.right,
+                maxOf(safeArea.bottom, minimumSystemBand) + systemKeyGap,
+            )
             insets
         }
         LayoutInflater.from(context).inflate(R.layout.keyboard_view, this, true)

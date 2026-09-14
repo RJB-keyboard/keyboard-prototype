@@ -74,7 +74,7 @@ class GlideKeyboardViewTest {
         assertEquals(2, requests.size)
         assertEquals(2, requests[0].points.size)
         assertEquals(3, requests[1].points.size)
-        assertEquals(48, requests[1].keys.size)
+        assertEquals(47, requests[1].keys.size)
         assertEquals(listOf("あ", "い"), StubCandidateEngine().generateCandidates(requests[1]))
     }
 
@@ -183,26 +183,62 @@ class GlideKeyboardViewTest {
             androidx.core.view.ViewCompat.dispatchApplyWindowInsets(keyboard, insets)
             assertEquals(12, keyboard.paddingLeft)
             assertEquals(8, keyboard.paddingRight)
-            assertEquals(64, keyboard.paddingBottom)
+            assertEquals(maxOf(64, (48 * keyboard.resources.displayMetrics.density).toInt()) +
+                (8 * keyboard.resources.displayMetrics.density).toInt(), keyboard.paddingBottom)
         }
         val cleared = androidx.core.view.WindowInsetsCompat.Builder()
             .setInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.NONE)
             .build()
         androidx.core.view.ViewCompat.dispatchApplyWindowInsets(keyboard, cleared)
-        assertEquals(0, keyboard.paddingBottom)
+        assertEquals((48 * keyboard.resources.displayMetrics.density).toInt() +
+            (8 * keyboard.resources.displayMetrics.density).toInt(), keyboard.paddingBottom)
         assertEquals(0, keyboard.paddingLeft)
         assertEquals(0, keyboard.paddingRight)
     }
 
     @Test
-    fun embeddedSmallTsuAndLongVowelSubmitTraces() = withKeyboard { keyboard, board ->
+    fun allKeysStayOutsideCaptionAndSideNavigationAreasInBothOrientations() = withKeyboard { keyboard, _ ->
+        val density = keyboard.resources.displayMetrics.density
+        keyboard.showCandidates(listOf("あ", "い"))
+        val captionHeight = (80 * density).toInt()
+        for (width in listOf(1100, 2200)) {
+            val sideWidth = if (width == 2200) 100 else 0
+            val insets = androidx.core.view.WindowInsetsCompat.Builder()
+                .setInsetsIgnoringVisibility(androidx.core.view.WindowInsetsCompat.Type.captionBar(),
+                    androidx.core.graphics.Insets.of(0, 0, 0, captionHeight))
+                .setInsetsIgnoringVisibility(androidx.core.view.WindowInsetsCompat.Type.navigationBars(),
+                    androidx.core.graphics.Insets.of(0, 0, sideWidth, 24))
+                .build()
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(keyboard, insets)
+            keyboard.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            keyboard.layout(0, 0, width, keyboard.measuredHeight)
+            fun checkKeys(view: View) {
+                if (view.isClickable && view.visibility == View.VISIBLE) {
+                    val bounds = android.graphics.Rect()
+                    view.getDrawingRect(bounds)
+                    keyboard.offsetDescendantRectToMyCoords(view, bounds)
+                    assertTrue("Key overlaps system band: $bounds",
+                        bounds.bottom <= keyboard.height - captionHeight - (8 * density).toInt())
+                    assertTrue("Key overlaps side navigation: $bounds", bounds.right <= width - sideWidth)
+                }
+                if (view is android.view.ViewGroup) {
+                    for (i in 0 until view.childCount) checkKeys(view.getChildAt(i))
+                }
+            }
+            checkKeys(keyboard)
+        }
+    }
+
+    @Test
+    fun longVowelBelowWaWoNSubmitsTrace() = withKeyboard { keyboard, board ->
         val requests = mutableListOf<GlideTrace>()
         keyboard.onTraceCompleted = { requests.add(it) }
-        for ((index, y) in listOf(0.3f, 0.7f).withIndex()) {
-            touch(board, MotionEvent.ACTION_DOWN, 0.25f, y, 100L + index * 100)
-            touch(board, MotionEvent.ACTION_UP, 0.25f, y, 120L + index * 100)
+        for ((index, y) in listOf(0.7f).withIndex()) {
+            touch(board, MotionEvent.ACTION_DOWN, 0.05f, y, 100L + index * 100)
+            touch(board, MotionEvent.ACTION_UP, 0.05f, y, 120L + index * 100)
         }
-        assertEquals(listOf("っ", "ー"), requests.map { trace ->
+        assertEquals(listOf("ー"), requests.map { trace ->
             val point = trace.points.first()
             trace.keys.single { it.contains(point.x, point.y) }.kana
         })
@@ -282,8 +318,8 @@ class GlideKeyboardViewTest {
     fun blanksAreIgnoredAndAccessibleKeyClicksSubmitATap() = withKeyboard { keyboard, board ->
         val requests = mutableListOf<GlideTrace>()
         keyboard.onTraceCompleted = { requests.add(it) }
-        touch(board, MotionEvent.ACTION_DOWN, 0.5f / 10, 0.3f, 100)
-        touch(board, MotionEvent.ACTION_UP, 0.5f / 10, 0.3f, 120)
+        touch(board, MotionEvent.ACTION_DOWN, 0.5f / 10, 0.9f, 100)
+        touch(board, MotionEvent.ACTION_UP, 0.5f / 10, 0.9f, 120)
         assertTrue(requests.isEmpty())
         val key = (0 until board.childCount).map { board.getChildAt(it) as TextView }.first { it.text == "ん" }
         key.performClick()

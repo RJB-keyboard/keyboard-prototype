@@ -5,9 +5,9 @@ import net.ramdos.keyboard_prototype.engine.KanaKey
 /** Vertical columns read from right to left. Blank cells are not keys. */
 object GojuonLayout {
     private val columns = listOf(
-        listOf("わ", null, "を", null, "ん"),
+        listOf("わ", "を", "ん", "ー", null),
         listOf("ら", "り", "る", "れ", "ろ"),
-        listOf("や", "っ", "ゆ", "ー", "よ"),
+        listOf("や", null, "ゆ", null, "よ"),
         listOf("ま", "み", "む", "め", "も"),
         listOf("は", "ひ", "ふ", "へ", "ほ"),
         listOf("な", "に", "ぬ", "ね", "の"),
