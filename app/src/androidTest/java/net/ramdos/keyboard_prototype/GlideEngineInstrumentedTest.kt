@@ -97,7 +97,7 @@ class GlideEngineInstrumentedTest {
             val candidates = engine.generateCandidates(traceFor("にほんこ"), "私は")
             Log.i("GlideEngineTest", "Fixture decode millis=${(System.nanoTime() - started) / 1_000_000}, candidates=$candidates")
             assertTrue("Expected 日本語 among $candidates", "日本語" in candidates)
-            assertTrue(candidates.any { candidate -> candidate.all { it in '\u3041'..'\u3096' } })
+            assertTrue(candidates.any { candidate -> candidate.all { it in '\u3041'..'\u3096' || it == 'ー' } })
             assertEquals(candidates.size, candidates.distinct().size)
             assertTrue(candidates.size <= 12)
         }
@@ -147,7 +147,7 @@ class GlideEngineInstrumentedTest {
         assertEquals(candidates.size, candidates.map { it.reading }.distinct().size)
         assertEquals(1.0, candidates.sumOf { it.posterior }, 1e-9)
         assertTrue(candidates.all { candidate ->
-            candidate.reading.isNotEmpty() && candidate.reading.all { it in '\u3041'..'\u3096' } &&
+            candidate.reading.isNotEmpty() && candidate.reading.all { it in '\u3041'..'\u3096' || it == 'ー' } &&
                 candidate.score.isFinite() && candidate.posterior.isFinite()
         })
         assertTrue(candidates.zipWithNext().all { (first, second) -> first.score >= second.score })

@@ -90,7 +90,7 @@ class GlideDecoder(
                     checkBudget()
                     require(probabilities.size == missing.size) { "Language model returned the wrong batch size" }
                     missing.zip(probabilities).forEach { (prefix, distribution) ->
-                        require(distribution.all { (kana, value) -> kana.isHiraganaLetter() && !value.isNaN() && value <= 0.000001 }) {
+                        require(distribution.all { (kana, value) -> kana.isKanaReadingCharacter() && !value.isNaN() && value <= 0.000001 }) {
                             "Language model must return hiragana natural log probabilities"
                         }
                         languageCache[prefix] = distribution.mapValues { minOf(0.0, it.value) }

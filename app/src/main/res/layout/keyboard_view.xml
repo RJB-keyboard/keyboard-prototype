@@ -11,35 +11,45 @@
         android:textColor="#42516A"
         android:textSize="12sp" />
 
-    <FrameLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="96dp"
+        android:orientation="horizontal"
         android:paddingStart="8dp"
         android:paddingEnd="8dp">
 
-        <TextView
-            android:id="@+id/candidate_hint"
-            android:layout_width="match_parent"
+        <FrameLayout
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:text="@string/candidate_hint"
-            android:textColor="#42516A"
-            android:textSize="14sp" />
+            android:layout_weight="1">
 
-        <HorizontalScrollView
-            android:id="@+id/candidate_scroll"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scrollbars="none"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:id="@+id/candidate_row"
-                android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/candidate_hint"
+                android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:orientation="horizontal" />
-        </HorizontalScrollView>
-    </FrameLayout>
+                android:gravity="center_vertical"
+                android:text="@string/candidate_hint"
+                android:textColor="#42516A"
+                android:textSize="14sp" />
+
+            <HorizontalScrollView
+                android:id="@+id/candidate_scroll"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scrollbars="none"
+                android:visibility="gone">
+
+                <GridLayout
+                    android:id="@+id/candidate_row"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:rowCount="2" />
+            </HorizontalScrollView>
+        </FrameLayout>
+
+
+    </LinearLayout>
 
     <net.ramdos.keyboard_prototype.ui.GojuonBoardView
         android:id="@+id/gojuon_board"
@@ -47,5 +57,65 @@
         android:layout_height="@dimen/gojuon_board_height"
         android:layout_marginStart="4dp"
         android:layout_marginEnd="4dp"
-        android:layout_marginBottom="48dp" />
+        android:layout_marginBottom="4dp" />
+
+    <LinearLayout
+        android:id="@+id/action_row"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="4dp"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/backspace_key"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:backgroundTint="#FFFFFF"
+            android:contentDescription="@string/backspace_description"
+            android:text="@string/backspace_key"
+            android:textAllCaps="false"
+            android:textColor="#17212E"
+            android:textSize="16sp" />
+        <Button
+            android:id="@+id/space_key"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="2"
+            android:minWidth="0dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:backgroundTint="#FFFFFF"
+            android:contentDescription="@string/space_description"
+            android:text="@string/space_key"
+            android:textAllCaps="false"
+            android:textColor="#17212E"
+            android:textSize="16sp" />
+        <Button
+            android:id="@+id/enter_key"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:backgroundTint="#FFFFFF"
+            android:contentDescription="@string/enter_newline"
+            android:text="@string/enter_newline"
+            android:textAllCaps="false"
+            android:textColor="#17212E"
+            android:textSize="16sp" />
+    </LinearLayout>
+
 </merge>

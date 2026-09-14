@@ -38,4 +38,4 @@ interface ReadingLexiconSession {
 data class LexiconScore(val cost: Double, val unknownCharacters: Int = 0)
 
 /** Modern and historical hiragana letters, excluding combining dakuten marks. */
-internal fun Char.isHiraganaLetter(): Boolean = this in '\u3041'..'\u3096'
+internal fun Char.isKanaReadingCharacter(): Boolean = this in '\u3041'..'\u3096' || this == 'ー'

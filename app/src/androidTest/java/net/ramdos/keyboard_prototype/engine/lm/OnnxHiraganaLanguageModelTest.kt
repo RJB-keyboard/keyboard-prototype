@@ -16,7 +16,7 @@ class OnnxHiraganaLanguageModelTest {
     fun actualModelReturnsNormalizedContextSensitiveKanaDistribution() {
         val first = model.nextLogProbabilities("きょうのてんきは", listOf("")).single()
         val second = model.nextLogProbabilities("にほんのしゅとは", listOf("")).single()
-        assertEquals(86, first.size)
+        assertEquals(87, first.size)
         assertEquals(1.0, first.values.sumOf(::exp), 1e-8)
         assertTrue(first.values.all { it.isFinite() && it <= 0.0 })
         assertTrue(first.keys.any { abs(first.getValue(it) - second.getValue(it)) > 1e-3 })
