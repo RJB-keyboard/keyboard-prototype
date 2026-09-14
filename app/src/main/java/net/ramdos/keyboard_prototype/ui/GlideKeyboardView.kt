@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
+import android.widget.GridLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -17,9 +18,10 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     var onCandidateSelected: ((String) -> Unit)? = null
     var onGestureStarted: (() -> Unit)? = null
     var onGestureCancelled: (() -> Unit)? = null
+    var onBackspace: (() -> Unit)? = null
 
     private val board: GojuonBoardView
-    private val candidateRow: LinearLayout
+    private val candidateRow: GridLayout
     private val candidateScroll: HorizontalScrollView
     private val hint: TextView
 
@@ -31,6 +33,10 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         candidateRow = findViewById(R.id.candidate_row)
         candidateScroll = findViewById(R.id.candidate_scroll)
         hint = findViewById(R.id.candidate_hint)
+        findViewById<Button>(R.id.backspace_key).setOnClickListener {
+            reset()
+            onBackspace?.invoke()
+        }
 
         board.onGestureStarted = {
             onGestureStarted?.invoke()
@@ -49,7 +55,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         hint.visibility = if (candidates.isEmpty()) View.VISIBLE else View.GONE
         hint.setText(R.string.candidate_hint)
         candidateScroll.visibility = if (candidates.isEmpty()) View.GONE else View.VISIBLE
-        candidates.forEach { candidate ->
+        candidates.forEachIndexed { index, candidate ->
             candidateRow.addView(Button(context).apply {
                 text = candidate
                 textSize = 22f
@@ -58,7 +64,13 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
                 backgroundTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
                 contentDescription = context.getString(R.string.commit_candidate, candidate)
                 setOnClickListener { onCandidateSelected?.invoke(candidate) }
-            }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+            }, GridLayout.LayoutParams(
+                GridLayout.spec(index % 2),
+                GridLayout.spec(index / 2, GridLayout.FILL),
+            ).apply {
+                width = LayoutParams.WRAP_CONTENT
+                height = (48 * resources.displayMetrics.density).toInt()
+            })
         }
         candidateScroll.scrollTo(0, 0)
     }

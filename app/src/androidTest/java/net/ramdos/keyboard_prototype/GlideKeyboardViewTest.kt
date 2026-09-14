@@ -4,7 +4,7 @@ import android.view.ContextThemeWrapper
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
-import android.widget.LinearLayout
+import android.widget.GridLayout
 import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -53,7 +53,7 @@ class GlideKeyboardViewTest {
         }
         keyboard.onTraceCompleted = { keyboard.showCandidates(engine.generateCandidates(it)) }
         keyboard.onCandidateSelected = { selections.add(it); keyboard.reset() }
-        val row = keyboard.findViewById<LinearLayout>(R.id.candidate_row)
+        val row = keyboard.findViewById<GridLayout>(R.id.candidate_row)
 
         touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
         assertTrue(requests.isEmpty())
@@ -79,6 +79,26 @@ class GlideKeyboardViewTest {
     }
 
     @Test
+    fun backspaceClearsCandidatesAndCancelsAnActiveTrace() = withKeyboard { keyboard, board ->
+        var deletions = 0
+        var traces = 0
+        keyboard.onBackspace = { deletions++ }
+        keyboard.onTraceCompleted = { traces++ }
+        val key = keyboard.findViewById<Button>(R.id.backspace_key)
+        keyboard.showCandidates(listOf("あ", "い"))
+        key.performClick()
+        assertEquals(1, deletions)
+        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        assertEquals(View.VISIBLE, keyboard.findViewById<TextView>(R.id.candidate_hint).visibility)
+
+        touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
+        key.performClick()
+        touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
+        assertEquals(2, deletions)
+        assertEquals(0, traces)
+    }
+
+    @Test
     fun batchedHistoricalPointsKeepTheirCoordinatesAndTime() = withKeyboard { keyboard, board ->
         var trace: GlideTrace? = null
         keyboard.onTraceCompleted = { trace = it }
@@ -101,7 +121,7 @@ class GlideKeyboardViewTest {
     fun cancellationOutsideReleaseAndResetDoNotProduceCandidates() = withKeyboard { keyboard, board ->
         var completed = 0
         keyboard.onTraceCompleted = { completed++; keyboard.showCandidates(listOf("あ", "い")) }
-        val row = keyboard.findViewById<LinearLayout>(R.id.candidate_row)
+        val row = keyboard.findViewById<GridLayout>(R.id.candidate_row)
         touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
         touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
         assertEquals(2, row.childCount)

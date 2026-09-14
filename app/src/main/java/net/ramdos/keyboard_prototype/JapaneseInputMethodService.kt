@@ -75,6 +75,7 @@ class JapaneseInputMethodService : InputMethodService() {
                     reset()
                 }
             }
+            onBackspace = { currentInputConnection?.backspace() }
             keyboardView = this
         }
     }

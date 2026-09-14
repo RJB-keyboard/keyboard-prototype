@@ -15,4 +15,6 @@
     <string name="engine_unavailable">入力エンジンを起動できませんでした</string>
     <string name="engine_failed">候補を生成できませんでした。もう一度なぞってください</string>
     <string name="commit_candidate">%1$s を入力</string>
+    <string name="backspace_key">⌫</string>
+    <string name="backspace_description">削除（Backspace）</string>
 </resources>
