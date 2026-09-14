@@ -69,6 +69,22 @@
         android:layoutDirection="ltr"
         android:orientation="horizontal">
         <Button
+            android:id="@+id/hide_keyboard_key"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:backgroundTint="#FFFFFF"
+            android:contentDescription="@string/hide_keyboard_description"
+            android:text="@string/hide_keyboard_key"
+            android:textAllCaps="false"
+            android:textColor="#17212E"
+            android:textSize="16sp" />
+        <Button
             android:id="@+id/backspace_key"
             android:layout_width="0dp"
             android:layout_height="match_parent"

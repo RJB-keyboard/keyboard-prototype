@@ -9,6 +9,8 @@ import android.widget.GridLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import net.ramdos.keyboard_prototype.R
 import net.ramdos.keyboard_prototype.engine.GlideTrace
 
@@ -18,6 +20,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     var onCandidateSelected: ((String) -> Unit)? = null
     var onGestureStarted: (() -> Unit)? = null
     var onGestureCancelled: (() -> Unit)? = null
+    var onHideKeyboard: (() -> Unit)? = null
     var onSpace: (() -> Unit)? = null
     var onEnter: (() -> Unit)? = null
     var onBackspace: (() -> Unit)? = null
@@ -30,6 +33,14 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     init {
         orientation = VERTICAL
         setBackgroundColor(Color.rgb(232, 236, 241))
+        // Reserve system navigation / cutout space so IME controls never cover keys.
+        ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+            val safeArea = insets.getInsets(
+                WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            view.setPadding(safeArea.left, 0, safeArea.right, safeArea.bottom)
+            insets
+        }
         LayoutInflater.from(context).inflate(R.layout.keyboard_view, this, true)
         board = findViewById(R.id.gojuon_board)
         candidateRow = findViewById(R.id.candidate_row)
@@ -48,6 +59,11 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         findViewById<Button>(R.id.space_key).setOnClickListener {
             reset()
             onSpace?.invoke()
+        }
+
+        findViewById<Button>(R.id.hide_keyboard_key).setOnClickListener {
+            reset()
+            onHideKeyboard?.invoke()
         }
 
         board.onGestureStarted = {

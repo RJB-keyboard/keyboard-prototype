@@ -108,7 +108,7 @@ Backspaceは、日本語・英字・選択範囲・サロゲートペアの削�
 
 ## 改行・実行キー
 
-五十音表の下に高さ48dpの操作段を配置し、左から「削除・スペース・Enter」を幅1:2:1で並べます。従来の下部余白を活用し、五十音表のキー寸法を維持します。スペースは半角空白を直接入力し、未選択の候補と軌跡を消去します。候補欄は全幅を利用します。
+五十音表の下に高さ48dpの操作段を配置し、左から「収納・削除・スペース・Enter」を幅1:1:2:1で並べます。従来の下部余白を活用し、五十音表のキー寸法を維持します。スペースは半角空白を直接入力し、未選択の候補と軌跡を消去します。候補欄は全幅を利用します。
 入力欄の設定に合わせて「改行」「実行」「検索」「送信」「次へ」「前へ」「完了」を表示します。アプリ独自のアクション名にも対応します。改行を要求する入力欄（IME_FLAG_NO_ENTER_ACTION）では実行せず改行します。押下時に未選択の候補と軌跡を消去します。
 
 仕様参考: [Android EditorInfo](https://developer.android.com/reference/android/view/inputmethod/EditorInfo)
@@ -123,7 +123,9 @@ Backspaceは、日本語・英字・選択範囲・サロゲートペアの削�
 を る ゆ む ふ ぬ つ す く う
    れ ー め へ ね て せ け え
 ん ろ よ も ほ の と そ こ お
-   [削除] [ スペース ] [Enter]
+   [収納] [削除] [ スペース ] [Enter]
 ```
 
 macOSでは `JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' sh ./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:connectedDebugAndroidTest` で検証できます。
+
+収納キーは候補と軌跡を消去して `requestHideSelf(0)` でIMEを閉じます。システムのナビゲーション領域と画面の切り欠きに応じて余白を確保し、OS側の収納・切替ボタンが操作キーに重なることを防ぎます。

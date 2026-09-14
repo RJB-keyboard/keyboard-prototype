@@ -119,6 +119,26 @@ class GlideKeyboardViewTest {
     }
 
     @Test
+    fun hideKeyboardClearsCandidatesAndCancelsAnActiveTrace() = withKeyboard { keyboard, board ->
+        var hides = 0
+        var traces = 0
+        keyboard.onHideKeyboard = { hides++ }
+        keyboard.onTraceCompleted = { traces++ }
+        val key = keyboard.findViewById<Button>(R.id.hide_keyboard_key)
+        keyboard.showCandidates(listOf("あ", "い"))
+        key.performClick()
+        assertEquals(1, hides)
+        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        assertEquals(View.VISIBLE, keyboard.findViewById<TextView>(R.id.candidate_hint).visibility)
+
+        touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
+        key.performClick()
+        touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
+        assertEquals(2, hides)
+        assertEquals(0, traces)
+    }
+
+    @Test
     fun enterClearsCandidatesAndCancelsTraceFromTheBottomRow() = withKeyboard { keyboard, board ->
         var enters = 0
         var traces = 0
@@ -132,6 +152,8 @@ class GlideKeyboardViewTest {
         assertTrue(keyBounds.top >= board.bottom)
         assertTrue(kotlin.math.abs(delete.width - key.width) <= 1)
         val space = keyboard.findViewById<Button>(R.id.space_key)
+        val hide = keyboard.findViewById<Button>(R.id.hide_keyboard_key)
+        assertTrue(hide.right <= delete.left)
         assertTrue(delete.right <= space.left)
         assertTrue(space.right <= key.left)
         assertTrue(kotlin.math.abs(space.width - 2 * delete.width) <= 2)
@@ -148,6 +170,28 @@ class GlideKeyboardViewTest {
         touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
         assertEquals(2, enters)
         assertEquals(0, traces)
+    }
+
+    @Test
+    fun navigationInsetsReserveSpaceWithoutAccumulatingPadding() = withKeyboard { keyboard, _ ->
+        val insets = androidx.core.view.WindowInsetsCompat.Builder()
+            .setInsets(
+                androidx.core.view.WindowInsetsCompat.Type.navigationBars(),
+                androidx.core.graphics.Insets.of(12, 0, 8, 64),
+            ).build()
+        repeat(2) {
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(keyboard, insets)
+            assertEquals(12, keyboard.paddingLeft)
+            assertEquals(8, keyboard.paddingRight)
+            assertEquals(64, keyboard.paddingBottom)
+        }
+        val cleared = androidx.core.view.WindowInsetsCompat.Builder()
+            .setInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.NONE)
+            .build()
+        androidx.core.view.ViewCompat.dispatchApplyWindowInsets(keyboard, cleared)
+        assertEquals(0, keyboard.paddingBottom)
+        assertEquals(0, keyboard.paddingLeft)
+        assertEquals(0, keyboard.paddingRight)
     }
 
     @Test

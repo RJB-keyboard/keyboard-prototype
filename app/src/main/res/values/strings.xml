@@ -26,4 +26,6 @@
     <string name="enter_done">完了</string>
     <string name="space_key">スペース</string>
     <string name="space_description">半角スペースを入力</string>
+    <string name="hide_keyboard_key">収納</string>
+    <string name="hide_keyboard_description">キーボードを閉じる</string>
 </resources>
