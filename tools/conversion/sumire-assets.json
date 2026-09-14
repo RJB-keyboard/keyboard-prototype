@@ -1,0 +1,15 @@
+﻿{
+  "upstream": "https://github.com/KazumaProject/kotlin-kana-kanji-converter",
+  "tag": "v1.7.252",
+  "commit": "a1c44cc6f104e381056c0acc42d8d22a36a5918c",
+  "url": "https://github.com/KazumaProject/kotlin-kana-kanji-converter/releases/download/v1.7.252/japanese_keyboard_dictionary_assets.zip",
+  "sha256": "36e0ae5f184a43ded423b2274c89100a2cc33db8f9086ffecf99b25462c79866",
+  "files": [
+    { "entry": "app/src/main/assets/connectionId.dat.zip", "name": "connectionId.dat.zip", "sha256": "f68938f2c3f48ad4176bb8feec874e2ae6a924343ccc0feec8ae858c92ffd6df" },
+    { "entry": "app/src/main/assets/pos_table.dat", "name": "pos_table.dat", "sha256": "2aa09e7f5318cb7be2f7d88c4a4473987a480bbecce3269685f7696797ed9f48" },
+    { "entry": "app/src/main/assets/system/tango.dat.zip", "name": "tango.dat.zip", "sha256": "00114445f1d134c2bc4272fa461cc1ecd1906eb77deb74057940a3bfe18833a1" },
+    { "entry": "app/src/main/assets/system/token.dat.zip", "name": "token.dat.zip", "sha256": "c729d71be38d7f23924e57fe39428823c216649a8ceda75fb90428f5485c4d5d" },
+    { "entry": "app/src/main/assets/system/yomi.dat.zip", "name": "yomi.dat.zip", "sha256": "ca7e139fffec9b2a386b1b01a47492c80e5dfd40febec927c58faa2fcc7f2392" }
+  ]
+}
+

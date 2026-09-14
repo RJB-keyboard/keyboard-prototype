@@ -15,6 +15,8 @@ import net.ramdos.keyboard_prototype.engine.GlideTrace
 class GlideKeyboardView(context: Context) : LinearLayout(context) {
     var onTraceCompleted: ((GlideTrace) -> Unit)? = null
     var onCandidateSelected: ((String) -> Unit)? = null
+    var onGestureStarted: (() -> Unit)? = null
+    var onGestureCancelled: (() -> Unit)? = null
 
     private val board: GojuonBoardView
     private val candidateRow: LinearLayout
@@ -31,10 +33,14 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         hint = findViewById(R.id.candidate_hint)
 
         board.onGestureStarted = {
+            onGestureStarted?.invoke()
             showCandidates(emptyList())
             hint.setText(R.string.glide_in_progress)
         }
-        board.onGestureCancelled = { showCandidates(emptyList()) }
+        board.onGestureCancelled = {
+            onGestureCancelled?.invoke()
+            showCandidates(emptyList())
+        }
         board.onTraceCompleted = { onTraceCompleted?.invoke(it) }
     }
 
@@ -60,5 +66,10 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     fun reset() {
         board.clearTrace()
         showCandidates(emptyList())
+    }
+
+    fun showStatus(message: Int) {
+        showCandidates(emptyList())
+        hint.setText(message)
     }
 }
