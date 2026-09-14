@@ -17,4 +17,11 @@
     <string name="commit_candidate">%1$s を入力</string>
     <string name="backspace_key">⌫</string>
     <string name="backspace_description">削除（Backspace）</string>
+    <string name="enter_newline">改行</string>
+    <string name="enter_go">実行</string>
+    <string name="enter_search">検索</string>
+    <string name="enter_send">送信</string>
+    <string name="enter_next">次へ</string>
+    <string name="enter_previous">前へ</string>
+    <string name="enter_done">完了</string>
 </resources>

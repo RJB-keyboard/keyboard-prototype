@@ -18,6 +18,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     var onCandidateSelected: ((String) -> Unit)? = null
     var onGestureStarted: (() -> Unit)? = null
     var onGestureCancelled: (() -> Unit)? = null
+    var onEnter: (() -> Unit)? = null
     var onBackspace: (() -> Unit)? = null
 
     private val board: GojuonBoardView
@@ -36,6 +37,11 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         findViewById<Button>(R.id.backspace_key).setOnClickListener {
             reset()
             onBackspace?.invoke()
+        }
+
+        findViewById<Button>(R.id.enter_key).setOnClickListener {
+            reset()
+            onEnter?.invoke()
         }
 
         board.onGestureStarted = {
@@ -73,6 +79,13 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             })
         }
         candidateScroll.scrollTo(0, 0)
+    }
+
+    fun setEnterLabel(label: CharSequence) {
+        findViewById<Button>(R.id.enter_key).apply {
+            text = label
+            contentDescription = label
+        }
     }
 
     fun reset() {

@@ -99,6 +99,34 @@ class GlideKeyboardViewTest {
     }
 
     @Test
+    fun enterClearsCandidatesAndCancelsTraceWithoutExtendingTheKeyboard() = withKeyboard { keyboard, board ->
+        var enters = 0
+        var traces = 0
+        keyboard.onEnter = { enters++ }
+        keyboard.onTraceCompleted = { traces++ }
+        val key = keyboard.findViewById<Button>(R.id.enter_key)
+        val delete = keyboard.findViewById<Button>(R.id.backspace_key)
+        val keyBounds = android.graphics.Rect()
+        key.getDrawingRect(keyBounds)
+        keyboard.offsetDescendantRectToMyCoords(key, keyBounds)
+        assertTrue(keyBounds.bottom <= board.top)
+        assertEquals(delete.width, key.width)
+        assertEquals((48 * keyboard.resources.displayMetrics.density).toInt(), key.height)
+        keyboard.setEnterLabel("検索")
+        assertEquals("検索", key.text.toString())
+        assertEquals("検索", key.contentDescription.toString())
+        keyboard.showCandidates(listOf("あ", "い"))
+        key.performClick()
+        assertEquals(1, enters)
+        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
+        key.performClick()
+        touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
+        assertEquals(2, enters)
+        assertEquals(0, traces)
+    }
+
+    @Test
     fun batchedHistoricalPointsKeepTheirCoordinatesAndTime() = withKeyboard { keyboard, board ->
         var trace: GlideTrace? = null
         keyboard.onTraceCompleted = { trace = it }

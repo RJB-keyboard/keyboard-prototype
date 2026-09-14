@@ -85,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File tools/prepare_hiragana_model.ps1
 - 横画面は表の高さを縮め、入力先を表示したままにします。
 - Backspaceはタップごとに削除し、候補と軌跡もクリアします。文字はUnicodeコードポイント単位で削除するため、サロゲートペアを分断しません。複数コードポイントからなる絵文字などは一度では消えない場合があります。長押しによる連続削除は未実装です。
 - 濁音・半濁音・小書き文字は元のキーの確率的な別候補です（例：は→は／ば／ぱ、や→や／ゃ）。同じキーで小さな往復をすると連続文字の手がかりになります。
-- 改行・句読点キーと学習による個人最適化は未実装です。軌跡認識の係数と候補品質は実操作データによる調整が必要です。
+- 句読点キーと学習による個人最適化は未実装です。軌跡認識の係数と候補品質は実操作データによる調整が必要です。
 - 文脈はカーソル直前最大256文字を読み取り、モデルへ渡すのは最大96トークンです。パスワード欄と `IME_FLAG_NO_PERSONALIZED_LEARNING` 指定時は前文脈を読み取りません。
 - 入力内容や軌跡を永続保存・送信する処理はありません。変換結果の小さなキャッシュはメモリー内のみで保持します。
 
@@ -105,3 +105,10 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 Backspaceは、日本語・英字・選択範囲・サロゲートペアの削除、空欄・先頭での操作、削除API未対応時のキーイベント、候補と軌跡のクリアを確認します。
 
 参考: [Android公式IMEガイド](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method?hl=ja)、[MotionEvent](https://developer.android.com/reference/android/view/MotionEvent)。
+
+## 改行・実行キー
+
+候補欄右側の既存80dp幅・96dp高さの領域を、上段の削除キーと下段の改行・実行キー（各48dp）に分けています。五十音表の位置・高さ、キーボード下端は変わりません。
+入力欄の設定に合わせて「改行」「実行」「検索」「送信」「次へ」「前へ」「完了」を表示します。アプリ独自のアクション名にも対応します。改行を要求する入力欄（IME_FLAG_NO_ENTER_ACTION）では実行せず改行します。押下時に未選択の候補と軌跡を消去します。
+
+仕様参考: [Android EditorInfo](https://developer.android.com/reference/android/view/inputmethod/EditorInfo)
