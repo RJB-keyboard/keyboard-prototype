@@ -75,8 +75,10 @@ class JapaneseInputMethodService : InputMethodService() {
                     reset()
                 }
             }
-            onBackspace = { currentInputConnection?.backspace() }
+            onSpace = { candidates.invalidate(); currentInputConnection?.commitText(" ", 1) }
+            onBackspace = { candidates.invalidate(); currentInputConnection?.backspace() }
             onEnter = {
+                candidates.invalidate()
                 currentInputConnection?.enter(currentInputEditorInfo)
             }
             setEnterLabel(enterAction(currentInputEditorInfo).label(this@JapaneseInputMethodService))

@@ -7,7 +7,7 @@ object GojuonLayout {
     private val columns = listOf(
         listOf("わ", null, "を", null, "ん"),
         listOf("ら", "り", "る", "れ", "ろ"),
-        listOf("や", null, "ゆ", null, "よ"),
+        listOf("や", "っ", "ゆ", "ー", "よ"),
         listOf("ま", "み", "む", "め", "も"),
         listOf("は", "ひ", "ふ", "へ", "ほ"),
         listOf("な", "に", "ぬ", "ね", "の"),

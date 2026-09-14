@@ -74,7 +74,7 @@ class GlideKeyboardViewTest {
         assertEquals(2, requests.size)
         assertEquals(2, requests[0].points.size)
         assertEquals(3, requests[1].points.size)
-        assertEquals(46, requests[1].keys.size)
+        assertEquals(48, requests[1].keys.size)
         assertEquals(listOf("あ", "い"), StubCandidateEngine().generateCandidates(requests[1]))
     }
 
@@ -99,7 +99,27 @@ class GlideKeyboardViewTest {
     }
 
     @Test
-    fun enterClearsCandidatesAndCancelsTraceWithoutExtendingTheKeyboard() = withKeyboard { keyboard, board ->
+    fun spaceClearsCandidatesAndCancelsAnActiveTrace() = withKeyboard { keyboard, board ->
+        var spaces = 0
+        var traces = 0
+        keyboard.onSpace = { spaces++ }
+        keyboard.onTraceCompleted = { traces++ }
+        val key = keyboard.findViewById<Button>(R.id.space_key)
+        keyboard.showCandidates(listOf("あ", "い"))
+        key.performClick()
+        assertEquals(1, spaces)
+        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        assertEquals(View.VISIBLE, keyboard.findViewById<TextView>(R.id.candidate_hint).visibility)
+
+        touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
+        key.performClick()
+        touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
+        assertEquals(2, spaces)
+        assertEquals(0, traces)
+    }
+
+    @Test
+    fun enterClearsCandidatesAndCancelsTraceFromTheBottomRow() = withKeyboard { keyboard, board ->
         var enters = 0
         var traces = 0
         keyboard.onEnter = { enters++ }
@@ -109,8 +129,12 @@ class GlideKeyboardViewTest {
         val keyBounds = android.graphics.Rect()
         key.getDrawingRect(keyBounds)
         keyboard.offsetDescendantRectToMyCoords(key, keyBounds)
-        assertTrue(keyBounds.bottom <= board.top)
-        assertEquals(delete.width, key.width)
+        assertTrue(keyBounds.top >= board.bottom)
+        assertTrue(kotlin.math.abs(delete.width - key.width) <= 1)
+        val space = keyboard.findViewById<Button>(R.id.space_key)
+        assertTrue(delete.right <= space.left)
+        assertTrue(space.right <= key.left)
+        assertTrue(kotlin.math.abs(space.width - 2 * delete.width) <= 2)
         assertEquals((48 * keyboard.resources.displayMetrics.density).toInt(), key.height)
         keyboard.setEnterLabel("検索")
         assertEquals("検索", key.text.toString())
@@ -124,6 +148,20 @@ class GlideKeyboardViewTest {
         touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
         assertEquals(2, enters)
         assertEquals(0, traces)
+    }
+
+    @Test
+    fun embeddedSmallTsuAndLongVowelSubmitTraces() = withKeyboard { keyboard, board ->
+        val requests = mutableListOf<GlideTrace>()
+        keyboard.onTraceCompleted = { requests.add(it) }
+        for ((index, y) in listOf(0.3f, 0.7f).withIndex()) {
+            touch(board, MotionEvent.ACTION_DOWN, 0.25f, y, 100L + index * 100)
+            touch(board, MotionEvent.ACTION_UP, 0.25f, y, 120L + index * 100)
+        }
+        assertEquals(listOf("っ", "ー"), requests.map { trace ->
+            val point = trace.points.first()
+            trace.keys.single { it.contains(point.x, point.y) }.kana
+        })
     }
 
     @Test

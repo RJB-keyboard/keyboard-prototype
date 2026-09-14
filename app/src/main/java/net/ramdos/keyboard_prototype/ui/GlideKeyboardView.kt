@@ -18,6 +18,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     var onCandidateSelected: ((String) -> Unit)? = null
     var onGestureStarted: (() -> Unit)? = null
     var onGestureCancelled: (() -> Unit)? = null
+    var onSpace: (() -> Unit)? = null
     var onEnter: (() -> Unit)? = null
     var onBackspace: (() -> Unit)? = null
 
@@ -42,6 +43,11 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         findViewById<Button>(R.id.enter_key).setOnClickListener {
             reset()
             onEnter?.invoke()
+        }
+
+        findViewById<Button>(R.id.space_key).setOnClickListener {
+            reset()
+            onSpace?.invoke()
         }
 
         board.onGestureStarted = {
