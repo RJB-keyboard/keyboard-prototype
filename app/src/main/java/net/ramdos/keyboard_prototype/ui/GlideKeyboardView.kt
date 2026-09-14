@@ -1,7 +1,11 @@
 package net.ramdos.keyboard_prototype.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.os.Handler
+import android.os.Looper
+import android.view.MotionEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
@@ -20,7 +24,6 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     var onCandidateSelected: ((String) -> Unit)? = null
     var onGestureStarted: (() -> Unit)? = null
     var onGestureCancelled: (() -> Unit)? = null
-    var onHideKeyboard: (() -> Unit)? = null
     var onSpace: (() -> Unit)? = null
     var onEnter: (() -> Unit)? = null
     var onBackspace: (() -> Unit)? = null
@@ -29,6 +32,17 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     private val candidateRow: GridLayout
     private val candidateScroll: HorizontalScrollView
     private val hint: TextView
+
+    private val repeatHandler = Handler(Looper.getMainLooper())
+    private var backspaceHeld = false
+    private lateinit var backspaceKey: Button
+    private val repeatBackspace = object : Runnable {
+        override fun run() {
+            if (!backspaceHeld) return
+            backspaceKey.performClick()
+            if (backspaceHeld) repeatHandler.postDelayed(this, 80L)
+        }
+    }
 
     init {
         orientation = VERTICAL
@@ -55,10 +69,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         candidateRow = findViewById(R.id.candidate_row)
         candidateScroll = findViewById(R.id.candidate_scroll)
         hint = findViewById(R.id.candidate_hint)
-        findViewById<Button>(R.id.backspace_key).setOnClickListener {
-            reset()
-            onBackspace?.invoke()
-        }
+        bindBackspaceKey()
 
         findViewById<Button>(R.id.enter_key).setOnClickListener {
             reset()
@@ -68,11 +79,6 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         findViewById<Button>(R.id.space_key).setOnClickListener {
             reset()
             onSpace?.invoke()
-        }
-
-        findViewById<Button>(R.id.hide_keyboard_key).setOnClickListener {
-            reset()
-            onHideKeyboard?.invoke()
         }
 
         board.onGestureStarted = {
@@ -85,6 +91,35 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             showCandidates(emptyList())
         }
         board.onTraceCompleted = { onTraceCompleted?.invoke(it) }
+    }
+
+    // Button already implements performClick; touch and accessibility share its click listener.
+    @SuppressLint("ClickableViewAccessibility")
+    private fun bindBackspaceKey() {
+        backspaceKey = findViewById(R.id.backspace_key)
+        backspaceKey.setOnClickListener {
+            board.clearTrace()
+            showCandidates(emptyList())
+            onBackspace?.invoke()
+        }
+        backspaceKey.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    stopBackspaceRepeat()
+                    backspaceHeld = true
+                    view.isPressed = true
+                    view.performClick()
+                    if (backspaceHeld) repeatHandler.postDelayed(repeatBackspace, 400L)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (event.x < 0 || event.x >= view.width ||
+                        event.y < 0 || event.y >= view.height) stopBackspaceRepeat()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL,
+                MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> stopBackspaceRepeat()
+            }
+            true
+        }
     }
 
     fun showCandidates(candidates: List<String>) {
@@ -119,7 +154,24 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         }
     }
 
+    private fun stopBackspaceRepeat() {
+        backspaceHeld = false
+        repeatHandler.removeCallbacks(repeatBackspace)
+        backspaceKey.isPressed = false
+    }
+
+    override fun onDetachedFromWindow() {
+        stopBackspaceRepeat()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility != View.VISIBLE && ::backspaceKey.isInitialized) stopBackspaceRepeat()
+    }
+
     fun reset() {
+        stopBackspaceRepeat()
         board.clearTrace()
         showCandidates(emptyList())
     }

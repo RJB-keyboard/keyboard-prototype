@@ -119,26 +119,6 @@ class GlideKeyboardViewTest {
     }
 
     @Test
-    fun hideKeyboardClearsCandidatesAndCancelsAnActiveTrace() = withKeyboard { keyboard, board ->
-        var hides = 0
-        var traces = 0
-        keyboard.onHideKeyboard = { hides++ }
-        keyboard.onTraceCompleted = { traces++ }
-        val key = keyboard.findViewById<Button>(R.id.hide_keyboard_key)
-        keyboard.showCandidates(listOf("あ", "い"))
-        key.performClick()
-        assertEquals(1, hides)
-        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
-        assertEquals(View.VISIBLE, keyboard.findViewById<TextView>(R.id.candidate_hint).visibility)
-
-        touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
-        key.performClick()
-        touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
-        assertEquals(2, hides)
-        assertEquals(0, traces)
-    }
-
-    @Test
     fun enterClearsCandidatesAndCancelsTraceFromTheBottomRow() = withKeyboard { keyboard, board ->
         var enters = 0
         var traces = 0
@@ -152,8 +132,6 @@ class GlideKeyboardViewTest {
         assertTrue(keyBounds.top >= board.bottom)
         assertTrue(kotlin.math.abs(delete.width - key.width) <= 1)
         val space = keyboard.findViewById<Button>(R.id.space_key)
-        val hide = keyboard.findViewById<Button>(R.id.hide_keyboard_key)
-        assertTrue(hide.right <= delete.left)
         assertTrue(delete.right <= space.left)
         assertTrue(space.right <= key.left)
         assertTrue(kotlin.math.abs(space.width - 2 * delete.width) <= 2)
@@ -234,7 +212,7 @@ class GlideKeyboardViewTest {
     fun longVowelBelowWaWoNSubmitsTrace() = withKeyboard { keyboard, board ->
         val requests = mutableListOf<GlideTrace>()
         keyboard.onTraceCompleted = { requests.add(it) }
-        for ((index, y) in listOf(0.7f).withIndex()) {
+        for ((index, y) in listOf(0.9f).withIndex()) {
             touch(board, MotionEvent.ACTION_DOWN, 0.05f, y, 100L + index * 100)
             touch(board, MotionEvent.ACTION_UP, 0.05f, y, 120L + index * 100)
         }
@@ -318,8 +296,8 @@ class GlideKeyboardViewTest {
     fun blanksAreIgnoredAndAccessibleKeyClicksSubmitATap() = withKeyboard { keyboard, board ->
         val requests = mutableListOf<GlideTrace>()
         keyboard.onTraceCompleted = { requests.add(it) }
-        touch(board, MotionEvent.ACTION_DOWN, 0.5f / 10, 0.9f, 100)
-        touch(board, MotionEvent.ACTION_UP, 0.5f / 10, 0.9f, 120)
+        touch(board, MotionEvent.ACTION_DOWN, 0.5f / 10, 0.7f, 100)
+        touch(board, MotionEvent.ACTION_UP, 0.5f / 10, 0.7f, 120)
         assertTrue(requests.isEmpty())
         val key = (0 until board.childCount).map { board.getChildAt(it) as TextView }.first { it.text == "ん" }
         key.performClick()

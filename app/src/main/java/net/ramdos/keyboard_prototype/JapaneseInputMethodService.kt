@@ -75,7 +75,6 @@ class JapaneseInputMethodService : InputMethodService() {
                     reset()
                 }
             }
-            onHideKeyboard = { requestHideSelf(0) }
             onSpace = { candidates.invalidate(); currentInputConnection?.commitText(" ", 1) }
             onBackspace = { candidates.invalidate(); currentInputConnection?.backspace() }
             onEnter = {
@@ -126,6 +125,7 @@ class JapaneseInputMethodService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        keyboardView?.reset()
         keyboardView = null
         candidates.close()
         super.onDestroy()

@@ -20,10 +20,11 @@ class GojuonLayoutTest {
 
     @Test
     fun blankCellsAndOutsideCoordinatesAreNotEdgeKeys() {
-        for ((row, kana) in listOf("わ", "を", "ん", "ー").withIndex()) {
+        for ((row, kana) in listOf("わ", "を", "ん").withIndex()) {
             assertEquals(kana, GojuonLayout.keyAt(0.05f, (row + 0.5f) / 5)?.kana)
         }
-        assertNull(GojuonLayout.keyAt(0.05f, 0.9f))
+        assertNull(GojuonLayout.keyAt(0.05f, 0.7f))
+        assertEquals("ー", GojuonLayout.keyAt(0.05f, 0.9f)?.kana)
         assertNull(GojuonLayout.keyAt(0.25f, 0.3f))
         assertNull(GojuonLayout.keyAt(0.25f, 0.7f))
         assertNull(GojuonLayout.keyAt(-0.01f, 0.1f))
