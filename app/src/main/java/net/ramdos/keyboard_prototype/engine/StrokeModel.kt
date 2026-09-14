@@ -100,7 +100,7 @@ class StrokeModel(private val config: StrokeModelConfig = StrokeModelConfig()) {
     private fun isValid(trace: GlideTrace): Boolean {
         if (trace.points.isEmpty() || trace.points.size > config.maxInputPoints || trace.keys.isEmpty() || trace.keys.size > 128) return false
         if (trace.keys.any { key ->
-                key.kana.length != 1 || !key.kana[0].isHiraganaLetter() ||
+                key.kana.length != 1 || !key.kana[0].isKanaReadingCharacter() ||
                     !key.left.isFinite() || !key.right.isFinite() || !key.top.isFinite() || !key.bottom.isFinite() ||
                     !(key.right - key.left).isFinite() || !(key.bottom - key.top).isFinite() ||
                     key.right - key.left < 0.00001f || key.bottom - key.top < 0.00001f

@@ -1,6 +1,7 @@
 package net.ramdos.keyboard_prototype.engine.lm
 
 import java.text.Normalizer
+import net.ramdos.keyboard_prototype.engine.isKanaReadingCharacter
 import kotlin.math.exp
 import kotlin.math.ln
 
@@ -15,7 +16,7 @@ class HiraganaTokenizer(charOrds: List<Int>, val modelMaxLength: Int = 1024) {
         require(charOrds.isNotEmpty() && charOrds.distinct().size == charOrds.size)
         require(charOrds.all { it in 0..0xffff && it !in 0xd800..0xdfff })
         tokenIds = charOrds.mapIndexed { index, code -> code.toChar() to index + SPECIAL_TOKEN_COUNT }.toMap()
-        kanaTokenIds = tokenIds.filterKeys { it in '\u3041'..'\u3096' }
+        kanaTokenIds = tokenIds.filterKeys { it.isKanaReadingCharacter() }
         require(kanaTokenIds.isNotEmpty())
     }
 

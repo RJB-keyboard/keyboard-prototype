@@ -49,7 +49,7 @@ class HiraganaTokenizerTest {
         assertEquals(1.0, result.getValue('ん') - result.getValue('あ'), 1e-12)
         assertTrue(result.values.all { it.isFinite() && it <= 0.0 })
         assertFalse(result.containsKey('漢'))
-        assertFalse(result.containsKey('ー'))
+        assertTrue(result.containsKey('ー'))
     }
 
     @Test(expected = IllegalArgumentException::class)
