@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">五十音グライド・新配置</string>
-    <string name="ime_name">五十音グライド（新配置）</string>
+    <string name="app_name">五十音グライド</string>
+    <string name="ime_name">五十音グライド（試作）</string>
     <string name="setup_title">五十音をなぞって入力</string>
-    <string name="setup_instructions">1. 設定で「五十音グライド（新配置）」を有効にします。\n2. この画面に戻り、使用するキーボードを選びます。\n3. 下の入力欄をタップし、五十音表をタップするか、なぞって指を離します。\n4. 表の上に出る候補をタップすると入力が確定します。</string>
+    <string name="setup_instructions">1. 設定で「五十音グライド（試作）」を有効にします。\n2. この画面に戻り、使用するキーボードを選びます。\n3. 下の入力欄をタップし、五十音表をタップするか、なぞって指を離します。\n4. 表の上に出る候補をタップすると入力が確定します。</string>
     <string name="enable_keyboard">1. キーボードの設定を開く</string>
     <string name="choose_keyboard">2. キーボードを選ぶ</string>
     <string name="test_input_label">試し入力</string>

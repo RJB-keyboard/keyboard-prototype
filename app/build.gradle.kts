@@ -9,7 +9,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "net.ramdos.keyboard_prototype.ergonomic"
+        applicationId = "net.ramdos.keyboard_prototype"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
