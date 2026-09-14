@@ -4,13 +4,13 @@
 
 ## 使い方
 
-1. Android Studioでプロジェクトを開き、実機またはエミュレーターで `app` をRunします。
+1. 下記「ビルド準備」でモデルを取得し、Android Studioでプロジェクトを開いて実機またはエミュレーターで `app` をRunします。
 2. アプリの「1. キーボードの設定を開く」から「五十音グライド（試作）」を有効にします。
 3. アプリへ戻り、「2. キーボードを選ぶ」で「五十音グライド（試作）」を選択します。
 4. 試し入力欄をタップし、五十音表の文字をタップするか、指を置いたまま複数の文字をなぞります。
-5. 指を離すと表の上に「あ」「い」が表示されます。候補をタップすると入力先へ確定します。
+5. 指を離すと軌跡と文脈から生成した変換候補が表の上に表示されます。候補をタップすると入力先へ確定します。
 
-現在のエンジンは仮実装なので、どの文字をなぞっても候補は「あ」「い」です。表の文字を直接入力する動作ではありません。
+GPT-2の次かな予測と軌跡認識を混合し、読み候補を辞書ベースのエンジンで漢字に変換します。初回はモデルと辞書の読み込みに時間がかかります。入力中の通信はありません。
 
 表は右から左に「あ・か・さ・た・な・は・ま・や・ら・わ」の10列で、各列は上から下に並びます。わ行は「わ・空白・を・空白・ん」を縦一列に配置します。現代仮名46文字を配置し、や行・わ行の空きマスはキーにしません。グライド中は線と現在のキーを強調表示します。
 
@@ -23,8 +23,14 @@ GojuonBoardView: DOWN → MOVE（履歴点も取得）→ UP
     ↓ GlideTrace（座標・経過時刻・キー配置）
 GlideKeyboardView.onTraceCompleted
     ↓ JapaneseInputMethodService が橋渡し
-CandidateEngine.generateCandidates(trace)
-    ↓ List<String>（現在は「あ」「い」）
+CandidateSession（専用ワーカー、古いリクエストの破棄）
+    ↓ trace + カーソル直前の文章
+GlideCandidateEngine
+    ├─ StrokeModel → A（距離・曲がり・滞留・通過点のスキップ）
+    ├─ Kuromojiで文脈を読みへ → hiragana-gpt2-xsmall → B（次かな確率）
+    └─ GlideDecoder → ビーム探索で読み候補を生成
+         ↓ Sumireの辞書・接続コスト・Viterbi/A*でかな漢字変換
+    ↓ List<String>（変換候補＋最上位の読みそのもの）
 GlideKeyboardView.showCandidates
     ↓ 候補をタップ → onCandidateSelected
 JapaneseInputMethodService → InputConnection.commitText
@@ -35,7 +41,11 @@ JapaneseInputMethodService → InputConnection.commitText
 | フロント | `ui/GojuonLayout.kt` | 五十音の配置とヒット判定 |
 | フロント | `ui/GojuonBoardView.kt` | タップ・グライド収集、軌跡とキーの描画 |
 | フロント | `ui/GlideKeyboardView.kt` | 候補一覧の表示、軌跡と候補選択をコールバックで通知 |
-| エンジン | `engine/CandidateEngine.kt` | Androidに依存しないデータ型・インターフェースと仮実装 |
+| エンジン | `engine/CandidateEngine.kt` | 軌跡データと差し替え可能なインターフェース |
+| 軌跡認識・探索 | `engine/StrokeModel.kt`, `engine/GlideDecoder.kt` | 意味に依存しないA、A/Bのビーム探索、読みの確率と成分スコア |
+| かな予測 | `engine/lm/` | 指定GPT-2のONNX Runtime推論、文字単位のトークナイザー |
+| かな漢字変換 | `engine/conversion/` | 既存Sumireランタイム・辞書のアダプター、Kuromojiによる文脈読み取り |
+| 非同期処理 | `engine/CandidateSession.kt` | 推論の直列実行、中断、古い結果の破棄、リソース解放 |
 | IME接続 | `JapaneseInputMethodService.kt` | フロントとエンジンの接続、入力先への確定、セッションのリセット |
 
 Kotlinファイルは `app/src/main/java/net/ramdos/keyboard_prototype/` 以下にあります。
@@ -48,7 +58,19 @@ Kotlinファイルは `app/src/main/java/net/ramdos/keyboard_prototype/` 以下�
 - `GlideTrace.keys`: その軌跡で使用した文字と矩形領域。描画と同じ正規化座標を使います。
 - 戻り値は候補順の `List<String>`。空なら候補を表示しません。
 
-本物のエンジンを組み込むときは `CandidateEngine` を実装し、サービスの `candidateEngine` を差し替えます。フロントには候補を生成するロジックも文字を確定する処理もありません。現時点の呼び出しは指を離したときの同期処理です。重い辞書探索や推論を導入する際はバックグラウンド実行と古いセッションの結果破棄を追加してください。
+`GlideDecoder.decode(trace, context)` は `ReadingCandidate` を返し、読み・Aの対数確率・Bの対数確率・混合スコア・候補内の正規化確率を確認できます。初期スコアは `log A + 0.35 * log B`。`GlideDecoderConfig` でビーム幅、重み、文字追加ボーナス、上限を調整できます。Aは幾何学的なヒューリスティックで、実ストロークから学習した校正済み確率ではありません。候補確率は刈り込まれたビーム内での近似値です。長い読みへの言語モデルのペナルティは、実データに合わせて重みと文字追加ボーナスを調整する必要があります。
+
+Bはひらがなの次文字に条件付けた確率で、EOSはスコアに含めません。読みの長さは軌跡のイベントとスキップで決まります。漢字変換にはLLMを使いません。詳しくは [探索エンジン](docs/engine.md)、[モデル](docs/hiragana-model.md)、[変換エンジン](docs/conversion.md) を参照してください。
+
+フロントは推論を行わず、`CandidateSession` がワーカーで生成します。入力先の切り替え、カーソル移動、新しいジェスチャー、キャンセル時には処理を中断し、既にUIへ配送された結果も世代番号で破棄します。`StubCandidateEngine` はフロントのテスト用に残しており、IMEでは使いません。モデル・辞書が欠けた場合はエラーを表示します。
+
+## ビルド準備
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/prepare_hiragana_model.ps1
+```
+
+モデルは固定リビジョンとSHA-256で検証し、`app/src/main/assets/models/hiragana-gpt2-xsmall/model.onnx`（約85 MB）へ取得します。この大きなファイルはGit管理対象外です。Sumireの基本辞書はassetsに同梱しています。依存関係・ライセンス・辞書の再取得手順は上記の各ドキュメントにあります。APKへの同梱後はすべてオフラインで動作します。
 
 ## 操作の扱い
 
@@ -56,19 +78,23 @@ Kotlinファイルは `app/src/main/java/net/ramdos/keyboard_prototype/` 以下�
 - 空きマスから始めた操作は無視します。
 - 表の外で指を離す、操作がキャンセルされる、2本目の指を置く場合は、その軌跡を破棄します。
 - 横画面は表の高さを縮め、入力先を表示したままにします。
-- 文字認識・辞書変換・濁点・半濁点・小書き文字・削除・改行は未実装です。
-- 入力内容や軌跡を保存・送信する処理はありません。
+- 濁音・半濁音・小書き文字は元のキーの確率的な別候補です（例：は→は／ば／ぱ、や→や／ゃ）。同じキーで小さな往復をすると連続文字の手がかりになります。
+- 削除・改行・句読点キーと学習による個人最適化は未実装です。軌跡認識の係数と候補品質は実操作データによる調整が必要です。
+- 文脈はカーソル直前最大256文字を読み取り、モデルへ渡すのは最大96トークンです。パスワード欄と `IME_FLAG_NO_PERSONALIZED_LEARNING` 指定時は前文脈を読み取りません。
+- 入力内容や軌跡を永続保存・送信する処理はありません。変換結果の小さなキャッシュはメモリー内のみで保持します。
 
 ## 検証
 
 ```powershell
 .\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest
-# USBデバッグを許可した端末でフロントの動作テスト
+# USBデバッグを許可した端末またはエミュレーターで実モデル・辞書・UIのテスト
 .\gradlew.bat :app:connectedDebugAndroidTest
 ```
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`
 
-テストでは、46文字と空きマスのヒット判定、タップ／グライドでのエンジン差し替え、候補選択、移動履歴と時刻の保持、キャンセル・表外・マルチタッチ・リセット、アクセシビリティ経由のキークリックを確認します。
+テストでは、Aの正規化・通過点・繰り返し・濁音／小書き文字、Bによる候補順位の変化、混合確率、異常な入力、中断、古い結果の破棄、実辞書の漢字変換と読み戻しを確認します。端末テストでは実ONNXモデルの分布・文脈依存・バッチ整合性と、既存のタッチ・候補選択・キャンセル動作も検証します。
+
+実エンジンの結合テストでは、各文字で180ms滞留する「に→ほ→ん→こ」の軌跡と文脈「私は」から「日本語」が先頭、「にほんご」も候補に残ることを確認しました。API 36のエミュレーターで、モデル・辞書を読み込んだ後のこの1件は約202msでした。特定の合成軌跡での動作確認であり、実機の応答時間や自由なグライド入力の認識率を保証する測定ではありません。
 
 参考: [Android公式IMEガイド](https://developer.android.com/develop/ui/views/touch-and-input/creating-input-method?hl=ja)、[MotionEvent](https://developer.android.com/reference/android/view/MotionEvent)。

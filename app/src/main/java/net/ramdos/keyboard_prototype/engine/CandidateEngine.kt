@@ -19,14 +19,20 @@ data class KanaKey(
 /** One completed gesture, including the key geometry used when it was recorded. */
 data class GlideTrace(val points: List<TracePoint>, val keys: List<KanaKey>)
 
-/** Android-independent boundary. Results are ordered from most to least likely.
- * Called once on release, on the UI thread; implementations must return promptly.
- */
-fun interface CandidateEngine {
+/** Android-independent boundary. Production inference runs on a background worker. */
+fun interface CandidateEngine : AutoCloseable {
     fun generateCandidates(trace: GlideTrace): List<String>
+
+    fun generateCandidates(trace: GlideTrace, precedingText: String): List<String> =
+        generateCandidates(trace)
+
+    /** May be invoked by the UI while generation is running. Must be thread-safe. */
+    fun cancelPendingInference() {}
+
+    override fun close() {}
 }
 
-/** Placeholder for a future trajectory recognizer / dictionary. */
+/** Small deterministic fixture for frontend tests; never used by the IME. */
 class StubCandidateEngine : CandidateEngine {
     override fun generateCandidates(trace: GlideTrace): List<String> =
         if (trace.points.any { point -> trace.keys.any { it.contains(point.x, point.y) } }) {

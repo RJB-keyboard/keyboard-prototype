@@ -7,9 +7,12 @@
     <string name="choose_keyboard">2. キーボードを選ぶ</string>
     <string name="test_input_label">試し入力</string>
     <string name="test_input_hint">ここをタップして入力</string>
-    <string name="prototype_note">この試作版では、どの文字をタップ・グライドしても候補は「あ」「い」です。五十音表は右から左、各列は上から下へ読みます。元のキーボードへは、端末の切り替え機能、または上の選択ボタンから戻せます。</string>
-    <string name="candidate_title">変換候補（試作：あ・い）</string>
+    <string name="prototype_note">五十音表は右から左、各列は上から下へ読みます。なぞった軌跡と直前の文章から読みを予測し、変換候補を表示します。濁音・半濁音・小書き文字は元の文字をなぞって候補から選べます。元のキーボードへは端末の切り替え機能、または上の選択ボタンから戻せます。</string>
+    <string name="candidate_title">変換候補</string>
     <string name="candidate_hint">文字をタップ／なぞって指を離してください</string>
     <string name="glide_in_progress">指を離すと候補を表示します</string>
+    <string name="engine_working">候補を計算しています…</string>
+    <string name="engine_unavailable">入力エンジンを起動できませんでした</string>
+    <string name="engine_failed">候補を生成できませんでした。もう一度なぞってください</string>
     <string name="commit_candidate">%1$s を入力</string>
 </resources>

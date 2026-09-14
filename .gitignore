@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+/app/src/main/assets/models/hiragana-gpt2-xsmall/model.onnx
+/.model-verification/

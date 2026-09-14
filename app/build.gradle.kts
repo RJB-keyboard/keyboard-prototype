@@ -29,9 +29,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    packaging {
+        resources.merges += setOf("META-INF/CONTRIBUTORS.md", "META-INF/LICENSE.md")
+    }
 }
 
 dependencies {
+    implementation(libs.onnxruntime.android)
+    implementation(libs.kuromoji.ipadic)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
