@@ -7,7 +7,8 @@ class GlideCandidateEngine(
     config: GlideDecoderConfig = GlideDecoderConfig(),
     private val maxCandidates: Int = 12,
 ) : CandidateEngine {
-    private val decoder = GlideDecoder(languageModel = languageModel, config = config)
+    private val decoder = GlideDecoder(languageModel = languageModel, config = config,
+        readingLexicon = converter.readingLexicon)
 
     init { require(maxCandidates > 0) }
 
@@ -19,7 +20,9 @@ class GlideCandidateEngine(
         val readings = decoder.decode(trace, context)
         val choices = readings.map { candidate ->
             checkCancellation()
-            (converter.convert(candidate.reading, 3).filter { it.isNotBlank() } + candidate.reading).distinct()
+            // Keep a dictionary-unknown reading literal instead of dressing it up as spurious kanji.
+            val converted = if (candidate.unknownCharacters > 0) emptyList() else converter.convert(candidate.reading, 3)
+            (converted.filter { it.isNotBlank() } + candidate.reading).distinct()
         }
         // Keep several interpretations accessible; preserve the converter's own ranking.
         val result = linkedSetOf<String>()

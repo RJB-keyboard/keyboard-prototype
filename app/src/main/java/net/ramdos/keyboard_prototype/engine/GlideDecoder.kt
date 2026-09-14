@@ -12,6 +12,8 @@ data class GlideDecoderConfig(
     val languageWeight: Double = 0.35,
     val characterInsertionBonus: Double = 0.0,
     val maxDecodeMillis: Long = 5000,
+    val dictionaryWeight: Double = 1.0,
+    val unknownBeamSlots: Int = 2,
 ) {
     init {
         require(maxBeamWidth in 1..128)
@@ -21,6 +23,8 @@ data class GlideDecoderConfig(
         require(languageWeight.isFinite() && languageWeight in 0.0..100.0)
         require(characterInsertionBonus.isFinite() && characterInsertionBonus in -10.0..10.0)
         require(maxDecodeMillis in 1..120_000)
+        require(dictionaryWeight.isFinite() && dictionaryWeight in 0.0..100.0)
+        require(unknownBeamSlots in 0..128)
     }
 }
 
@@ -33,6 +37,8 @@ data class GlideDecoderConfig(
  * Optional characterInsertionBonus adds a per-character ranking reward; it is
  * zero by default. Tune it with languageWeight on held-out gestures because
  * multiplying next-character probabilities intrinsically favors shorter text.
+ * dictionaryCost is an additional ranking feature, not a probability. When a
+ * lexicon is enabled, posterior includes its weighted cost and remains a beam estimate.
  */
 data class ReadingCandidate(
     val reading: String,
@@ -40,6 +46,8 @@ data class ReadingCandidate(
     val languageLogProbability: Double,
     val score: Double,
     val posterior: Double,
+    val dictionaryCost: Double = 0.0,
+    val unknownCharacters: Int = 0,
 )
 
 class GlideDecodeTimeoutException : RuntimeException("Glide decoding exceeded its time budget")
@@ -49,8 +57,14 @@ class GlideDecoder(
     private val strokeModel: StrokeModel = StrokeModel(),
     private val languageModel: KanaLanguageModel,
     private val config: GlideDecoderConfig = GlideDecoderConfig(),
+    private val readingLexicon: ReadingLexicon? = null,
 ) {
-    private data class Hypothesis(val reading: String, val stroke: Double, val language: Double)
+    private data class Hypothesis(
+        val reading: String,
+        val stroke: Double,
+        val language: Double,
+        val dictionary: LexiconScore = LexiconScore(0.0),
+    )
 
     fun decode(trace: GlideTrace, context: String = "", limit: Int = config.maxCandidates): List<ReadingCandidate> {
         require(limit >= 0)
@@ -65,8 +79,9 @@ class GlideDecoder(
         if (lattice.events.isEmpty()) return emptyList()
         // Local to one call: no stale context, unbounded lifetime cache, or cross-thread state.
         val languageCache = HashMap<String, Map<Char, Double>>()
+        val lexicon = if (config.dictionaryWeight > 0.0) readingLexicon?.newSession() else null
         var beam = listOf(Hypothesis("", 0.0, 0.0))
-        lattice.events.forEach { event ->
+        lattice.events.forEachIndexed { eventIndex, event ->
             checkBudget()
             if (config.languageWeight > 0.0) {
                 val missing = beam.asSequence().map { it.reading }.filter { it.length < config.maxReadingLength && it !in languageCache }.distinct().toList()
@@ -99,21 +114,48 @@ class GlideDecoder(
                     }
                 }
             }
-            beam = next.values.sortedWith(compareByDescending<Hypothesis> { score(it) }.thenBy { it.reading }).take(config.maxBeamWidth)
+            // Evaluate total prefix cost once, after alignment paths have been merged.
+            // At release, incomplete dictionary prefixes must pay their completion/unknown cost
+            // BEFORE pruning, otherwise a promising complete word can be lost to a fragment.
+            val evaluated = if (lexicon == null) next.values.toList() else next.values.map {
+                checkBudget()
+                val dictionary = lexicon.evaluate(it.reading, complete = eventIndex == lattice.events.lastIndex)
+                require(dictionary.cost.isFinite() && dictionary.unknownCharacters in 0..it.reading.length) {
+                    "Dictionary must return finite costs and valid unknown-character counts"
+                }
+                it.copy(dictionary = dictionary)
+            }
+            beam = selectBeam(evaluated, config.maxBeamWidth, if (lexicon == null) 0 else config.unknownBeamSlots)
             if (beam.isEmpty()) return emptyList()
         }
         checkBudget()
-        val final = beam.filter { it.reading.isNotEmpty() }.take(minOf(limit, config.maxCandidates))
+        val finalLimit = minOf(limit, config.maxCandidates)
+        // Reserve one alternative for names/new words even when the lexicon disfavors it.
+        val final = selectBeam(beam.filter { it.reading.isNotEmpty() }, finalLimit,
+            if (lexicon != null && config.unknownBeamSlots > 0 && finalLimit > 1) 1 else 0)
         if (final.isEmpty()) return emptyList()
         val maxScore = score(final.first())
         val total = final.sumOf { exp(score(it) - maxScore) }
         return final.map {
             val score = score(it)
-            ReadingCandidate(it.reading, it.stroke, it.language, score, exp(score - maxScore) / total)
+            ReadingCandidate(it.reading, it.stroke, it.language, score, exp(score - maxScore) / total,
+                it.dictionary.cost, it.dictionary.unknownCharacters)
         }
     }
 
-    private fun score(hypothesis: Hypothesis): Double = config.strokeWeight * hypothesis.stroke + config.languageWeight * hypothesis.language + config.characterInsertionBonus * hypothesis.reading.length
+    private fun baseScore(hypothesis: Hypothesis): Double = config.strokeWeight * hypothesis.stroke + config.languageWeight * hypothesis.language + config.characterInsertionBonus * hypothesis.reading.length
+
+    private fun score(hypothesis: Hypothesis): Double = baseScore(hypothesis) - config.dictionaryWeight * hypothesis.dictionary.cost
+
+    private fun selectBeam(candidates: List<Hypothesis>, width: Int, reserved: Int): List<Hypothesis> {
+        val ranked = candidates.sortedWith(compareByDescending<Hypothesis> { score(it) }.thenBy { it.reading })
+        if (reserved == 0 || ranked.size <= width) return ranked.take(width)
+        val selected = ranked.take((width - reserved).coerceAtLeast(1)).associateByTo(linkedMapOf()) { it.reading }
+        candidates.sortedWith(compareByDescending<Hypothesis> { baseScore(it) }.thenBy { it.reading }).forEach {
+            if (selected.size < width) selected.putIfAbsent(it.reading, it)
+        }
+        return selected.values.sortedWith(compareByDescending<Hypothesis> { score(it) }.thenBy { it.reading })
+    }
 
     private fun logAdd(a: Double, b: Double): Double {
         val higher = max(a, b)

@@ -5,6 +5,25 @@ import org.junit.Test
 
 class GlideCandidateEngineTest {
     @Test
+    fun dictionaryUnknownReadingStaysLiteralInsteadOfBeingConvertedToKanjiFragments() {
+        val lm = object : KanaLanguageModel {
+            override fun nextLogProbabilities(context: String, prefixes: List<String>) =
+                prefixes.map { mapOf('あ' to 0.0) }
+        }
+        val converter = object : KanaKanjiConverter {
+            override val readingLexicon = object : ReadingLexicon {
+                override fun newSession() = object : ReadingLexiconSession {
+                    override fun evaluate(reading: String, complete: Boolean) = LexiconScore(4.0, reading.length)
+                }
+            }
+            override fun readingOf(text: String) = text
+            override fun convert(reading: String, limit: Int): List<String> = error("Unknown kana should stay literal")
+        }
+        val trace = GlideTrace(listOf(TracePoint(0.5f, 0.5f, 0)), listOf(KanaKey("あ", 0f, 0f, 1f, 1f)))
+        GlideCandidateEngine(lm, converter).use { assertEquals(listOf("あ"), it.generateCandidates(trace)) }
+    }
+
+    @Test
     fun passesReadingContextToLmThenConvertsAndRetainsLiteralKana() {
         var observedContext = ""
         var modelClosed = false
