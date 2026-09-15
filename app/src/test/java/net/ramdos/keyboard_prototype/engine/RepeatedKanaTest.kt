@@ -17,7 +17,7 @@ class RepeatedKanaTest {
 
     @Test
     fun oneVisitCanEmitOneTwoOrThreeCopiesWithNormalizedStrokeMass() {
-        val result = GlideDecoder(geometry, noLanguage, GlideDecoderConfig(languageWeight = 0.0)).decode(tap)
+        val result = GlideDecoder(geometry, noLanguage, GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0)).decode(tap)
         assertEquals(listOf("ま", "まま", "ままま"), result.map { it.reading })
         assertEquals(listOf(false, true, true), result.map { it.hasImplicitRepetition })
         listOf(0.85, 0.15 * 0.85, 0.15 * 0.15).zip(result).forEach { (expected, candidate) ->
@@ -33,7 +33,7 @@ class RepeatedKanaTest {
             TracePoint(0.5f, 0.5f, 0), TracePoint(0.95f, 0.5f, 50), TracePoint(0.5f, 0.5f, 100),
         ))
         assertEquals(2, geometry.lattice(loop).events.size)
-        val result = GlideDecoder(geometry, noLanguage, GlideDecoderConfig(languageWeight = 0.0)).decode(loop)
+        val result = GlideDecoder(geometry, noLanguage, GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0)).decode(loop)
         val probabilities = listOf(0.85, 0.15 * 0.85, 0.15 * 0.15)
         val expected = mutableMapOf<String, Double>()
         for (first in 1..3) for (second in 1..3) {
@@ -50,7 +50,7 @@ class RepeatedKanaTest {
     fun repeatedVoicedKanaKeepsTheChosenVariantAndPaysItsPriorOnce() {
         val trace = tap.copy(keys = listOf(KanaKey("は", 0f, 0f, 1f, 1f)))
         val result = GlideDecoder(geometry, noLanguage,
-            GlideDecoderConfig(languageWeight = 0.0, maxBeamWidth = 32, maxCandidates = 32)).decode(trace)
+            GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0, maxBeamWidth = 32, maxCandidates = 32)).decode(trace)
         assertTrue(result.any { it.reading == "ばば" })
         assertTrue(result.any { it.reading == "ぱぱぱ" })
         assertTrue(result.all { it.reading.toSet().size == 1 })
@@ -63,16 +63,16 @@ class RepeatedKanaTest {
     @Test
     fun repetitionCanBeDisabledAndRespectsTheReadingLengthCap() {
         for (config in listOf(
-            GlideDecoderConfig(languageWeight = 0.0, maxRepeatedCharactersPerEvent = 1),
-            GlideDecoderConfig(languageWeight = 0.0, repetitionProbability = 0.0),
-            GlideDecoderConfig(languageWeight = 0.0, maxReadingLength = 1),
+            GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0, maxRepeatedCharactersPerEvent = 1),
+            GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0, repetitionProbability = 0.0),
+            GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0, maxReadingLength = 1),
         )) {
             val result = GlideDecoder(geometry, noLanguage, config).decode(tap)
             assertEquals(listOf("ま"), result.map { it.reading })
             assertEquals(0.0, result.single().strokeLogProbability, 0.0)
         }
         val limited = GlideDecoder(geometry, noLanguage,
-            GlideDecoderConfig(languageWeight = 0.0, maxReadingLength = 2)).decode(tap)
+            GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0, maxReadingLength = 2)).decode(tap)
         assertEquals(listOf("ま", "まま"), limited.map { it.reading })
         assertEquals(1.0, limited.sumOf { exp(it.strokeLogProbability) }, 1e-10)
     }
@@ -80,7 +80,7 @@ class RepeatedKanaTest {
     @Test
     fun repeatedAlternativesSurviveAFullBeamWithoutDisplacingTheBestReading() {
         val trace = tap.copy(keys = listOf(KanaKey("は", 0f, 0f, 1f, 1f)))
-        val config = GlideDecoderConfig(languageWeight = 0.0, maxBeamWidth = 4, maxCandidates = 4)
+        val config = GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0, maxBeamWidth = 4, maxCandidates = 4)
         val result = GlideDecoder(geometry, noLanguage, config).decode(trace)
         assertEquals("は", result.first().reading)
         assertEquals(4, result.size)
@@ -100,7 +100,7 @@ class RepeatedKanaTest {
                     .mapIndexed { index, text -> ConversionCandidate(text, index.toDouble()) }.take(limit)
         }
         for (limit in listOf(1, 2, 3, 4, 12)) {
-            GlideCandidateEngine(noLanguage, converter, GlideDecoderConfig(languageWeight = 0.0), limit).use {
+            GlideCandidateEngine(noLanguage, converter, GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0), limit).use {
                 val result = it.generateCandidates(tap)
                 assertEquals("変換:ま", result.first())
                 assertTrue(result.size <= limit)
@@ -121,7 +121,7 @@ class RepeatedKanaTest {
             }
         }
         val result = GlideDecoder(geometry, noLanguage,
-            GlideDecoderConfig(languageWeight = 0.0, maxBeamWidth = 1, maxCandidates = 1), lexicon).decode(tap)
+            GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0, maxBeamWidth = 1, maxCandidates = 1), lexicon).decode(tap)
         assertEquals("ままま", result.single().reading)
         assertEquals(0.0, result.single().dictionaryCost, 0.0)
     }

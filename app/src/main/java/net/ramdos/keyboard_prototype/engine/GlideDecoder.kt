@@ -10,7 +10,10 @@ data class GlideDecoderConfig(
     val maxReadingLength: Int = 32,
     val strokeWeight: Double = 1.0,
     val languageWeight: Double = 0.35,
-    val characterInsertionBonus: Double = 0.0,
+    // Offset the next-kana product's length penalty during beam pruning too.
+    // At the default LM weight this nearly cancels a uniform kana prediction,
+    // while staying below the cost of a straight crossing or an implicit repeat.
+    val characterInsertionBonus: Double = 1.5,
     val maxDecodeMillis: Long = 5000,
     val dictionaryWeight: Double = 1.0,
     val unknownBeamSlots: Int = 2,
@@ -40,8 +43,8 @@ data class GlideDecoderConfig(
  * softmax of [score] over returned candidates only: a truncated beam estimate,
  * not calibrated confidence or the full probability mass of all readings.
  * When languageWeight is zero, B is not evaluated and its log score is zero.
- * Optional characterInsertionBonus adds a per-character ranking reward; it is
- * zero by default. Tune it with languageWeight on held-out gestures because
+ * characterInsertionBonus adds a per-character ranking reward (default 1.5).
+ * Tune it with languageWeight on held-out gestures because
  * multiplying next-character probabilities intrinsically favors shorter text.
  * dictionaryCost is an additional ranking feature, not a probability. When a
  * lexicon is enabled, posterior includes its weighted cost and remains a beam estimate.

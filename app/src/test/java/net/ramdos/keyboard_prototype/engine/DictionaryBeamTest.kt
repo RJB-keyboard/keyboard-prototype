@@ -15,7 +15,7 @@ class DictionaryBeamTest {
     @Test
     fun dictionaryKeepsAValidWordBeforeItsPrefixWouldBePruned() {
         val lexicon = lexicon { reading, _ -> LexiconScore(if ("がな".startsWith(reading)) 0.0 else 8.0) }
-        val config = GlideDecoderConfig(maxBeamWidth = 1, maxCandidates = 1, languageWeight = 0.0)
+        val config = GlideDecoderConfig(maxBeamWidth = 1, maxCandidates = 1, languageWeight = 0.0, characterInsertionBonus = 0.0)
         val plain = GlideDecoder(geometry, model, config).decode(trace)
         val guided = GlideDecoder(geometry, model, config, lexicon).decode(trace)
         assertEquals("かな", plain.single().reading)
@@ -31,7 +31,7 @@ class DictionaryBeamTest {
             observed += reading to complete
             LexiconScore(if (reading == "がな") 0.4 else if (complete) 8.0 else 0.2)
         }
-        val config = GlideDecoderConfig(languageWeight = 0.0, dictionaryWeight = 1.5)
+        val config = GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0, dictionaryWeight = 1.5)
         val result = GlideDecoder(geometry, model, config, lexicon).decode(trace)
         assertEquals("がな", result.first().reading)
         assertTrue(observed.any { it.first == "が" && !it.second })
@@ -47,7 +47,7 @@ class DictionaryBeamTest {
     fun unknownNameSurvivesInTheReservedFallbackSlot() {
         val lexicon = lexicon { reading, _ -> LexiconScore(if (reading.startsWith("か")) 100.0 else 0.0,
             if (reading.startsWith("か")) reading.length else 0) }
-        val config = GlideDecoderConfig(maxBeamWidth = 3, maxCandidates = 2, languageWeight = 0.0, unknownBeamSlots = 1)
+        val config = GlideDecoderConfig(maxBeamWidth = 3, maxCandidates = 2, languageWeight = 0.0, characterInsertionBonus = 0.0, unknownBeamSlots = 1)
         val result = GlideDecoder(geometry, model, config, lexicon).decode(trace)
         assertEquals("がな", result.first().reading)
         assertTrue(result.any { it.reading == "かな" && it.unknownCharacters == 2 })
@@ -58,7 +58,7 @@ class DictionaryBeamTest {
         val lexicon = object : ReadingLexicon {
             override fun newSession(): ReadingLexiconSession = error("Dictionary must not be consulted")
         }
-        val config = GlideDecoderConfig(languageWeight = 0.0, dictionaryWeight = 0.0)
+        val config = GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0, dictionaryWeight = 0.0)
         val result = GlideDecoder(geometry, model, config, lexicon).decode(trace)
         assertEquals("かな", result.first().reading)
         assertTrue(result.all { it.dictionaryCost == 0.0 })
@@ -75,7 +75,7 @@ class DictionaryBeamTest {
                 }
             }
         }
-        val decoder = GlideDecoder(geometry, model, GlideDecoderConfig(languageWeight = 0.0), lexicon)
+        val decoder = GlideDecoder(geometry, model, GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0), lexicon)
         decoder.decode(trace)
         decoder.decode(trace)
         assertEquals(2, sessions)
@@ -83,7 +83,7 @@ class DictionaryBeamTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsNonfiniteDictionaryScores() {
-        GlideDecoder(geometry, model, GlideDecoderConfig(languageWeight = 0.0),
+        GlideDecoder(geometry, model, GlideDecoderConfig(languageWeight = 0.0, characterInsertionBonus = 0.0),
             lexicon { _, _ -> LexiconScore(Double.NaN) }).decode(trace)
     }
 
