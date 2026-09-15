@@ -15,6 +15,7 @@ class SumireConversionInstrumentedTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         SumireKanaKanjiConverter.open(context).use { converter ->
             assertEquals("日本語", converter.convert("にほんご", 5).first())
+            assertEquals("胃が痛い", converter.convert("いがいたい", 3).first())
             val phrase = converter.convert("きょうはいいてんきです", 5)
             assertTrue(phrase.toString(), phrase.any { "今日" in it && "天気" in it })
             assertEquals("わたしはとうきょうへいきます。", converter.readingOf("私は東京へ行きます。"))

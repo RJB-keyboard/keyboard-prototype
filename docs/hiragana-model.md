@@ -1,5 +1,7 @@
 # ひらがな言語モデル B
 
+[READMEに戻る](../README.md) · [全体設計](architecture.md) · [開発手順](development.md)
+
 モデルは [hukuda222/hiragana-gpt2-xsmall](https://huggingface.co/hukuda222/hiragana-gpt2-xsmall/tree/b0ef59dcdfd8eaddc3010cb8a2060c6196bba573) の著者公開 ONNX をそのまま使用する。端末内 CPU 推論であり、入力文脈をサーバーへ送信しない。モデルカードのライセンスは Apache-2.0。
 
 ```powershell

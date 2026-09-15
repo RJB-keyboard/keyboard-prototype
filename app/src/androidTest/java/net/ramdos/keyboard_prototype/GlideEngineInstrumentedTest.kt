@@ -9,6 +9,8 @@ import net.ramdos.keyboard_prototype.engine.GlideDecoderConfig
 import net.ramdos.keyboard_prototype.engine.GlideTrace
 import net.ramdos.keyboard_prototype.engine.ReadingCandidate
 import net.ramdos.keyboard_prototype.engine.ReadingLexiconSession
+import net.ramdos.keyboard_prototype.engine.StrokeModel
+import net.ramdos.keyboard_prototype.engine.StrokeModelConfig
 import net.ramdos.keyboard_prototype.engine.TracePoint
 import net.ramdos.keyboard_prototype.engine.conversion.SumireKanaKanjiConverter
 import net.ramdos.keyboard_prototype.engine.lm.OnnxHiraganaLanguageModel
@@ -23,18 +25,111 @@ import kotlin.math.hypot
 @RunWith(AndroidJUnit4::class)
 class GlideEngineInstrumentedTest {
     @Test
-    fun comparesDictionaryOnTheSameNoisyContinuousGlidesUsingTheRealModel() {
+    fun nearbyKanaRemainCandidatesWithTheRealModelAndDictionary() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         OnnxHiraganaLanguageModel.open(context).use { model ->
             SumireKanaKanjiConverter.open(context).use { converter ->
                 val config = GlideDecoderConfig(maxDecodeMillis = 15_000)
+                val previous = GlideDecoder(
+                    StrokeModel(StrokeModelConfig(nearbyKeyCount = 3, distanceSigma = 0.43, maxNearbyKeyDistance = 16.0)),
+                    model, config, converter.readingLexicon)
+                val tolerant = GlideDecoder(languageModel = model, config = config, readingLexicon = converter.readingLexicon)
+                val engine = GlideCandidateEngine(model, converter, config)
+                model.nextLogProbabilities("", listOf(""))
+                for (fixture in listOf(
+                    NoisyFixture("ねこ", "ぬこ", ""),
+                    NoisyFixture("こんにちは", "こんにつは", ""),
+                    NoisyFixture("にほんご", "にほんけ", "わたしは"),
+                    NoisyFixture("ありがとう", "ありかとく", ""),
+                )) {
+                    // Retain center-to-center movement, removing stationary hold samples.
+                    val trace = traceFor(fixture.baseKeys).let {
+                        it.copy(points = it.points.filterIndexed { index, _ -> index % 2 == 0 })
+                    }
+                    val before = previous.decode(trace, fixture.context)
+                    val started = System.nanoTime()
+                    val after = tolerant.decode(trace, fixture.context)
+                    val millis = (System.nanoTime() - started) / 1_000_000
+                    val candidates = engine.rankCandidates(after)
+                    Log.i("GlideEngineTest", "Nearby ${fixture.reading}: millis=$millis before=${before.map { it.reading }} after=${after.map { it.reading }} candidates=$candidates")
+                    assertValidCandidates(after)
+                    val beforeRank = before.indexOfFirst { it.reading == fixture.reading }
+                    val afterRank = after.indexOfFirst { it.reading == fixture.reading }
+                    assertTrue("Expected ${fixture.reading} among $after", afterRank >= 0)
+                    if (beforeRank >= 0) assertTrue(afterRank <= beforeRank)
+                    when (fixture.reading) {
+                        "ねこ" -> {
+                            assertEquals(-1, beforeRank)
+                            assertTrue(afterRank < 3)
+                            assertTrue(candidates.toString(), candidates.any { it == "猫" || it == "ネコ" })
+                        }
+                        "にほんご" -> {
+                            assertTrue(afterRank < beforeRank)
+                            assertTrue(candidates.toString(), "日本語" in candidates)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun comparesAmbiguousPainAndShoppingReadings() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        OnnxHiraganaLanguageModel.open(context).use { model ->
+            SumireKanaKanjiConverter.open(context).use { converter ->
+                val decoder = GlideDecoder(languageModel = model, readingLexicon = converter.readingLexicon,
+                    config = GlideDecoderConfig(maxDecodeMillis = 15_000))
+                model.nextLogProbabilities("", listOf(""))
+                val engine = GlideCandidateEngine(model, converter, GlideDecoderConfig(maxDecodeMillis = 15_000))
+                for (baseKeys in listOf("いかいたい")) {
+                    for (trace in listOf(traceFor(baseKeys), continuousTraceFor(baseKeys, 0))) {
+                        val readings = decoder.decode(trace)
+                        Log.i("GlideEngineTest", "Ambiguous keys=$baseKeys points=${trace.points.size} readings=$readings")
+                        assertValidCandidates(readings)
+                        val candidates = engine.rankCandidates(readings)
+                        Log.i("GlideEngineTest", "Ambiguous candidates=$candidates")
+                        assertTrue(candidates.toString(), "胃が痛い" in candidates.take(3))
+                        assertTrue(candidates.toString(), "いかいたい" in candidates)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun realPipelineOffersGomamayoWithoutReturningToMa() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val model = OnnxHiraganaLanguageModel.open(context)
+        val converter = try { SumireKanaKanjiConverter.open(context) } catch (error: Throwable) {
+            model.close()
+            throw error
+        }
+        GlideCandidateEngine(model, converter).use { engine ->
+            val started = System.nanoTime()
+            val candidates = engine.generateCandidates(traceFor("こまよ"))
+            Log.i("GlideEngineTest", "Repeated kana millis=${(System.nanoTime() - started) / 1_000_000}, candidates=$candidates")
+            assertTrue("Expected ごままよ among $candidates", "ごままよ" in candidates)
+        }
+    }
+
+    @Test
+    fun comparesDictionaryOnTheSameNoisyContinuousGlidesUsingTheRealModel() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        OnnxHiraganaLanguageModel.open(context).use { model ->
+            SumireKanaKanjiConverter.open(context).use { converter ->
+                // Keep the historical dictionary comparison independent of length
+                // correction and the wider, more tolerant neighbourhood defaults.
+                val config = GlideDecoderConfig(maxDecodeMillis = 15_000, characterInsertionBonus = 0.0)
                 val lexicon = requireNotNull(converter.readingLexicon)
                 val withoutDictionary = GlideDecoder(
+                    strokeModel = StrokeModel(StrokeModelConfig(nearbyKeyCount = 3, distanceSigma = 0.43, maxNearbyKeyDistance = 16.0)),
                     languageModel = model,
                     readingLexicon = lexicon,
                     config = config.copy(dictionaryWeight = 0.0),
                 )
                 val withDictionary = GlideDecoder(
+                    strokeModel = StrokeModel(StrokeModelConfig(nearbyKeyCount = 3, distanceSigma = 0.43, maxNearbyKeyDistance = 16.0)),
                     languageModel = model,
                     readingLexicon = lexicon,
                     config = config.copy(dictionaryWeight = 1.0),
@@ -58,12 +153,13 @@ class GlideEngineInstrumentedTest {
                     assertValidCandidates(mixed)
                     when (fixture.reading) {
                         "にほんご" -> {
-                            // Measured regression: without dictionary costs this
-                            // 420 ms path loses ほ and prefers the fragment にんこ.
-                            assertEquals("にんこ", baseline.first().reading)
-                            assertEquals(1, baseline.indexOfFirst { it.reading == fixture.reading })
-                            assertEquals("にほんご", mixed.first().reading)
-                            assertTrue(mixed.first().dictionaryCost <
+                            // The updated wa-column layout changes this synthetic path.
+                            // Dictionary scoring improves 日本語 from third to second;
+                            // the shorter にこ still leads (first place is not claimed).
+                            assertEquals("にこ", baseline.first().reading)
+                            assertEquals(2, baseline.indexOfFirst { it.reading == fixture.reading })
+                            assertEquals(1, mixed.indexOfFirst { it.reading == fixture.reading })
+                            assertTrue(mixed.single { it.reading == fixture.reading }.dictionaryCost <
                                 diagnosticLexicon.evaluate(baseline.first().reading, complete = true).cost)
                         }
                         "こんにちは" -> {
@@ -73,11 +169,48 @@ class GlideEngineInstrumentedTest {
                             assertTrue("Dictionary should improve the greeting's rank", mixedRank < baselineRank)
                         }
                         "ありがとう" -> {
-                            assertEquals(fixture.reading, baseline.first().reading)
+                            // Splitting emission mass across repeat counts adds a
+                            // small length penalty; without dictionary scoring the
+                            // shorter ありとう can now lead, but ありがとう survives.
+                            assertTrue(baseline.indexOfFirst { it.reading == fixture.reading } in 0..1)
                             assertEquals(fixture.reading, mixed.first().reading)
                         }
                         // とうきょう currently misses the returned beam in both
                         // modes. Keep it in diagnostics without claiming a fix.
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun lengthCorrectionKeepsTracedReadingsAheadOfShortFragments() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        OnnxHiraganaLanguageModel.open(context).use { model ->
+            SumireKanaKanjiConverter.open(context).use { converter ->
+                val config = GlideDecoderConfig(maxDecodeMillis = 15_000)
+                val previous = GlideDecoder(languageModel = model, readingLexicon = converter.readingLexicon,
+                    config = config.copy(characterInsertionBonus = 0.0))
+                val corrected = GlideDecoder(languageModel = model, readingLexicon = converter.readingLexicon,
+                    config = config)
+                val engine = GlideCandidateEngine(model, converter, config)
+                model.nextLogProbabilities("", listOf(""))
+                val fixtures = listOf(
+                    NoisyFixture("こんにちは", "こんにちは", ""),
+                    NoisyFixture("ありがとう", "ありかとう", ""),
+                    NoisyFixture("にほんご", "にほんこ", "わたしは"),
+                )
+                fixtures.forEachIndexed { index, fixture ->
+                    val trace = continuousTraceFor(fixture.baseKeys, index)
+                    val baseline = previous.decode(trace, fixture.context)
+                    val readings = corrected.decode(trace, fixture.context)
+                    val candidates = engine.rankCandidates(readings)
+                    Log.i("GlideEngineTest", "Length correction ${fixture.reading}: before=$baseline after=$readings candidates=$candidates")
+                    assertValidCandidates(readings)
+                    assertEquals(fixture.reading, readings.first().reading)
+                    if (fixture.reading == "にほんご") {
+                        assertEquals("にこ", baseline.first().reading)
+                        assertTrue(candidates.toString(), "日本語" in candidates.take(3))
                     }
                 }
             }

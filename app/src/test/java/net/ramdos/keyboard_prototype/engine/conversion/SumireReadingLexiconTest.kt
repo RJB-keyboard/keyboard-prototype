@@ -159,8 +159,8 @@ class SumireReadingLexiconTest {
 
     companion object {
         private val converter by lazy {
-            val root = listOf(File("src/main/assets/conversion/sumire"),
-                File("app/src/main/assets/conversion/sumire")).first { it.isDirectory }
+            val root = listOf(File("src/main/assets/conversion"),
+                File("app/src/main/assets/conversion")).first { it.isDirectory }
             SumireKanaKanjiConverter.fromAssets { name -> File(root, name).inputStream() }
         }
 
