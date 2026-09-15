@@ -1,0 +1,15 @@
+{
+  "source": "https://downloads.tatoeba.org/exports/per_language/jpn/jpn_sentences_detailed.tsv.bz2",
+  "retrieved": "2026-09-15",
+  "sourceSha256": "22507d7f514fc6e600958c5e97403364af0ae755d53ed01397bce3d83ece1510",
+  "license": "CC-BY-2.0-FR",
+  "modelSha256": "4bfb7b4ecd7a22fd0dea0343f2bdf74ade5bcc0dcb246a556197a9e2828e3ef7",
+  "attributionSha256": "275d54ba06421d39b067964386b82c02aa69b193232fab3fc7dc228ced502216",
+  "trainingSentences": 224261,
+  "heldOutSentences": 24619,
+  "trainingCharacters": 4046654,
+  "orders": [1, 2, 3, 4],
+  "minimumCounts": [1, 2, 2, 3],
+  "entries": [3313, 67168, 232889, 185356],
+  "compressedBytes": 2006873
+}

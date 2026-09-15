@@ -9,6 +9,7 @@ import com.kazumaproject.graph.GraphBuilder
 import com.kazumaproject.mozc.ConnectionMatrix
 import com.kazumaproject.viterbi.FindPath
 import net.ramdos.keyboard_prototype.engine.KanaKanjiConverter
+import net.ramdos.keyboard_prototype.engine.ConversionCandidate
 import java.io.BufferedInputStream
 import java.io.InputStream
 import java.io.ObjectInputStream
@@ -18,7 +19,7 @@ import java.util.zip.ZipInputStream
 /**
  * Local Sumire dictionary/Viterbi conversion and Kuromoji IPADIC context readings.
  * Open and use on a worker: loading dictionaries and tokenization can be expensive.
- * No network access or language model is involved in either operation.
+ * Surface ranking uses a small character n-gram model; neither operation uses network or neural inference.
  */
 class SumireKanaKanjiConverter private constructor(
     private val yomi: LOUDSWithTermId,
@@ -27,6 +28,8 @@ class SumireKanaKanjiConverter private constructor(
     private val connections: ConnectionMatrix,
     private val tokenizer: Tokenizer,
     lexiconConfig: SumireLexiconConfig,
+    private val surfaceModel: SurfaceLanguageModel?,
+    private val surfaceConfig: SurfaceRerankingConfig,
 ) : KanaKanjiConverter {
     private val graphBuilder = GraphBuilder()
     private val pathFinder = FindPath()
@@ -34,13 +37,13 @@ class SumireKanaKanjiConverter private constructor(
     override val readingLexicon = SumireReadingLexicon(yomi, tokens, connections, lexiconConfig) {
         check(!closed) { "Kana-kanji converter is closed" }
     }
-    private val conversionCache = object : LinkedHashMap<String, List<String>>(64, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<String>>): Boolean =
+    private val conversionCache = object : LinkedHashMap<String, List<ConversionCandidate>>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<ConversionCandidate>>): Boolean =
             size > 64
     }
 
     @Synchronized
-    override fun convert(reading: String, limit: Int): List<String> {
+    override fun convertCandidates(reading: String, limit: Int): List<ConversionCandidate> {
         check(!closed) { "Kana-kanji converter is closed" }
         if (limit <= 0 || reading.isBlank()) return emptyList()
         val normalized = hiragana(Normalizer.normalize(reading, Normalizer.Form.NFKC))
@@ -52,9 +55,31 @@ class SumireKanaKanjiConverter private constructor(
         val cacheKey = "$count:$normalized"
         return conversionCache.getOrPut(cacheKey) {
             val graph = graphBuilder.constructGraph(normalized, yomi, tango, tokens)
-            pathFinder.backwardAStar(graph, normalized.length, connections, count)
-                .filter { it.isNotBlank() }.distinct().take(count)
+            val poolSize = if (surfaceModel == null) count else MAX_CANDIDATES
+            val candidates = pathFinder.backwardAStarCandidates(graph, normalized.length, connections, poolSize)
+                .filter { it.text.isNotBlank() }
+                .map {
+                    val scale = readingLexicon.config.costScale
+                    ConversionCandidate(it.text, it.cost * scale,
+                        wordCost = it.wordCost * scale, connectionCost = it.connectionCost * scale)
+                }
+            rerank(candidates).take(count)
         }
+    }
+
+    private fun rerank(candidates: List<ConversionCandidate>): List<ConversionCandidate> {
+        val model = surfaceModel ?: return candidates
+        val first = candidates.firstOrNull() ?: return candidates
+        val scored = candidates.map { it.copy(surfaceCost = model.cost(it.text)) }
+        val baseline = requireNotNull(scored.first().surfaceCost)
+        val differences = scored.map { candidate ->
+            // Do not rescue arbitrarily implausible dictionary paths with corpus frequency alone.
+            if (candidate.dictionaryCost - first.dictionaryCost > surfaceConfig.maxDictionaryGap) 0.0 else
+                surfaceConfig.weight * (requireNotNull(candidate.surfaceCost) - baseline)
+        }
+        return scored.zip(surfaceConfig.boundAdjustments(differences)).map { (candidate, adjustment) ->
+            candidate.copy(cost = candidate.dictionaryCost + adjustment, contextAdjustment = adjustment)
+        }.sortedWith(compareBy<ConversionCandidate> { it.cost }.thenBy { it.dictionaryCost })
     }
 
     /** Preserve unknown text and punctuation; the LM tokenizer handles unsupported symbols. */
@@ -77,7 +102,7 @@ class SumireKanaKanjiConverter private constructor(
     companion object {
         const val MAX_READING_LENGTH = 64
         private const val MAX_CANDIDATES = 20
-        private const val ASSET_ROOT = "conversion/sumire"
+        private const val ASSET_ROOT = "conversion"
         // ZipInputStream may report -1 until its trailing data descriptor is consumed.
         // This is the pinned v1.7.252 matrix's uncompressed byte count (2672² shorts).
         private const val CONNECTION_MATRIX_BYTES = 14_279_168L
@@ -85,16 +110,18 @@ class SumireKanaKanjiConverter private constructor(
         fun open(
             context: Context,
             lexiconConfig: SumireLexiconConfig = SumireLexiconConfig(),
+            surfaceConfig: SurfaceRerankingConfig = SurfaceRerankingConfig(),
         ): SumireKanaKanjiConverter =
-            fromAssets(lexiconConfig) { name -> context.applicationContext.assets.open("$ASSET_ROOT/$name") }
+            fromAssets(lexiconConfig, surfaceConfig) { name -> context.applicationContext.assets.open("$ASSET_ROOT/$name") }
 
         /** Shared byte-loading route used by Android and real-dictionary JVM integration tests. */
         internal fun fromAssets(
             lexiconConfig: SumireLexiconConfig = SumireLexiconConfig(),
+            surfaceConfig: SurfaceRerankingConfig = SurfaceRerankingConfig(),
             openAsset: (String) -> InputStream,
         ): SumireKanaKanjiConverter {
             fun <T> zippedObject(name: String, read: (ObjectInputStream) -> T): T =
-                openAsset("$name.zip").use { raw ->
+                openAsset("sumire/$name.zip").use { raw ->
                     ZipInputStream(BufferedInputStream(raw)).use { zip ->
                         val entry = checkNotNull(zip.nextEntry) { "Missing Sumire dictionary $name" }
                         check(entry.name == name && !entry.isDirectory) { "Invalid Sumire dictionary archive" }
@@ -105,10 +132,10 @@ class SumireKanaKanjiConverter private constructor(
             val tango = zippedObject("tango.dat") { LOUDS().readExternalNotCompress(it) }
             val tokens = TokenArray()
             zippedObject("token.dat") { tokens.readExternalNotCompress(it) }
-            openAsset("pos_table.dat").use { raw ->
+            openAsset("sumire/pos_table.dat").use { raw ->
                 ObjectInputStream(BufferedInputStream(raw)).use { tokens.readPOSTable(it) }
             }
-            val connections = openAsset("connectionId.dat.zip").use { raw ->
+            val connections = openAsset("sumire/connectionId.dat.zip").use { raw ->
                 ZipInputStream(BufferedInputStream(raw)).use { zip ->
                     val entry = checkNotNull(zip.nextEntry) { "Missing Sumire connection matrix" }
                     check(entry.name == "connectionId.dat" && !entry.isDirectory)
@@ -116,7 +143,11 @@ class SumireKanaKanjiConverter private constructor(
                     ConnectionMatrix.read(BufferedInputStream(zip), CONNECTION_MATRIX_BYTES)
                 }
             }
-            return SumireKanaKanjiConverter(yomi, tango, tokens, connections, Tokenizer(), lexiconConfig)
+            val surfaceModel = if (surfaceConfig.weight == 0.0) null else
+                // Gzip payload uses .bin: AAPT transparently expands assets ending in .gz.
+                openAsset("surface/model.bin").use(SurfaceLanguageModel::read)
+            return SumireKanaKanjiConverter(yomi, tango, tokens, connections, Tokenizer(), lexiconConfig,
+                surfaceModel, surfaceConfig)
         }
 
         internal fun hiragana(text: String): String = text.map {

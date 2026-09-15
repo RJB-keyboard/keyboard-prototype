@@ -1,5 +1,13 @@
 # Third-party notices
 
+## Surface language model added by keyboard-prototype
+
+The additional `conversion/surface/model.bin` is derived from Tatoeba Japanese
+sentences and is distributed under CC BY 2.0 FR. See `TATOEBA-NOTICE.md` and
+`TATOEBA-ATTRIBUTION.tsv.zip` in this directory for the source, modifications,
+license links, and sentence/contributor attribution. The notices below
+describe the original Sumire dictionary distribution.
+
 This release is a combined work. The project source code is MIT, but the
 generated dictionary data keeps the license and notice requirements of its
 upstream data sources. Do not treat the complete release archive as a single

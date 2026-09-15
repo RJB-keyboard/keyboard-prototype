@@ -19,9 +19,31 @@ interface KanaLanguageModel : AutoCloseable {
 interface KanaKanjiConverter : AutoCloseable {
     /** Optional dictionary shared with reading search; no additional model is loaded. */
     val readingLexicon: ReadingLexicon? get() = null
-    fun convert(reading: String, limit: Int): List<String>
+    fun convertCandidates(reading: String, limit: Int): List<ConversionCandidate>
+    fun convert(reading: String, limit: Int): List<String> =
+        convertCandidates(reading, limit).map { it.text }
     fun readingOf(text: String): String
     override fun close() {}
+}
+
+/** Lower is better; combined cost in the same scale as [LexiconScore.cost].
+ * Dictionary cost includes word and BOS/EOS connections; contextAdjustment reranks surfaces.
+ * Costs may be negative and are not probabilities. Component costs support ranking diagnostics.
+ */
+data class ConversionCandidate(
+    val text: String,
+    val cost: Double,
+    val dictionaryCost: Double = cost,
+    val contextAdjustment: Double = 0.0,
+    val wordCost: Double = dictionaryCost,
+    val connectionCost: Double = 0.0,
+    /** Absolute mean surface-model loss, comparable across readings; null when unavailable. */
+    val surfaceCost: Double? = null,
+) {
+    init {
+        require(listOf(cost, dictionaryCost, contextAdjustment, wordCost, connectionCost).all { it.isFinite() })
+        require(surfaceCost == null || surfaceCost.isFinite() && surfaceCost >= 0.0)
+    }
 }
 
 /** Creates request-local dictionary scoring state. A remains independent of this lexicon. */
