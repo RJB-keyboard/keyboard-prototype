@@ -108,11 +108,12 @@ Windows:
 
 ### GitHub Actions
 
-[Android CI](.github/workflows/android-ci.yml) は、全ブランチのpush・Pull Request・手動実行に対応します。
+[Android CI](.github/workflows/android-ci.yml) は、`main`へのpush・Pull Request・手動実行に対応します。作業ブランチはPull Requestの作成・更新時にチェックし、pushとの二重実行を防ぎます。
 
-- 単体テスト、Android Lint、デバッグAPKと端末テストAPKのビルドを実行します。
+- 単体テスト、Android Lint、APKビルドの3ジョブを最大3並列で実行します。APKビルドではデバッグAPKと端末テストAPKをまとめてビルドします。
+- 1ジョブが失敗しても残りのチェックは継続します。全ジョブの成功を、従来と同じ名前の `Unit tests, lint and build` チェックで判定します。
 - Gradleの依存関係をキャッシュし、同じブランチ／PRの古い実行をキャンセルします。
-- 成功・失敗にかかわらず、生成されたレポートを `android-check-reports` に14日間保存します。
+- 成功・失敗にかかわらず、生成されたレポートを `android-check-reports-unit-tests` と `android-check-reports-lint` に14日間保存します。
 - エミュレーターでの端末テスト実行はCIに含みません。上記の `connectedDebugAndroidTest` で実行します。
 
 ローカルのレポートは `app/build/reports/tests/testDebugUnitTest/index.html` と `app/build/reports/lint-results-debug.html`、JUnit XMLは `app/build/test-results/testDebugUnitTest/` に出力します。
