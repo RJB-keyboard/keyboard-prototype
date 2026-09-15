@@ -141,6 +141,25 @@ class SumireKanaKanjiConverterTest {
     }
 
     @Test
+    fun convertsKnownWordsAroundUnknownKana() {
+        val unknown = "ゕゖゕ"
+        val cases = listOf(
+            "${unknown}にほんご" to "${unknown}日本語",
+            "にほんご${unknown}" to "日本語${unknown}",
+            "にほんご${unknown}てんき" to "日本語${unknown}天気",
+        )
+        for ((reading, expected) in cases) {
+            assertTrue(reading, converter.readingLexicon.newSession()
+                .evaluate(reading, complete = true).unknownCharacters > 0)
+            val candidates = converter.convert(reading, 3)
+            assertTrue("$reading -> $candidates", expected in candidates)
+            assertEquals(candidates.distinct(), candidates)
+            assertTrue(candidates.size <= 3)
+        }
+        assertEquals(listOf(unknown), converter.convert(unknown, 3))
+    }
+
+    @Test
     fun contextUsesReadingsInsteadOfPronunciation() {
         assertEquals("わたしはとうきょうへいきます。", converter.readingOf("私は東京へ行きます。"))
         assertEquals("こーひー", converter.readingOf("コーヒー"))

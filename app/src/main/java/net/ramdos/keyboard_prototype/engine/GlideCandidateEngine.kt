@@ -38,9 +38,8 @@ class GlideCandidateEngine(
         if (readings.isEmpty()) return emptyList()
         val conversions = readings.map { candidate ->
             checkCancellation()
-            // Keep a dictionary-unknown reading literal instead of dressing it up as spurious kanji.
-            if (candidate.unknownCharacters > 0) emptyList() else
-                converter.convertCandidates(candidate.reading, 3).filter { it.text.isNotBlank() }
+            // Convert known spans even when the reading contains unknown kana; retain the literal below.
+            converter.convertCandidates(candidate.reading, 3).filter { it.text.isNotBlank() }
         }
         // Compare absolute surface evidence, never the per-reading anchored contextAdjustment.
         // Penalize relative to the best observed loss, bounded so strong gesture evidence wins.
