@@ -13,6 +13,26 @@ import kotlin.math.exp
 /** Requires the actual pinned assets; deliberately fails rather than skipping a missing model. */
 class OnnxHiraganaLanguageModelTest {
     @Test
+    fun repeatedLookaheadMatchesIndependentInferenceIncludingWindowBoundaries() {
+        for (context in listOf("", "わたしは", "あ".repeat(29), "あ".repeat(31), "あ".repeat(40))) {
+            val prefixes = listOf("ま", "ぱ", "ゃ", "こんにちは", "ゔ")
+            val batch = model.nextRepeatedLogProbabilities(context, prefixes, 3)
+            prefixes.forEachIndexed { row, prefix ->
+                assertTrue(batch[row].size in 1..3)
+                batch[row].forEachIndexed { step, distribution ->
+                    val independent = model.nextLogProbabilities(context,
+                        listOf(prefix + prefix.last().toString().repeat(step))).single()
+                    independent.forEach { (kana, value) ->
+                        assertEquals("contextLength=${context.length}, prefix=$prefix, step=$step, kana=$kana",
+                            value, distribution.getValue(kana), 2e-4)
+                    }
+                }
+                if (context.length >= 31) assertEquals(1, batch[row].size)
+            }
+        }
+    }
+
+    @Test
     fun actualModelReturnsNormalizedContextSensitiveKanaDistribution() {
         val first = model.nextLogProbabilities("きょうのてんきは", listOf("")).single()
         val second = model.nextLogProbabilities("にほんのしゅとは", listOf("")).single()
@@ -46,11 +66,14 @@ class OnnxHiraganaLanguageModelTest {
             Thread.currentThread().interrupt()
             val error = runCatching { model.nextLogProbabilities("", listOf("あ")) }.exceptionOrNull()
             assertTrue(error is CancellationException)
+            val lookaheadError = runCatching { model.nextRepeatedLogProbabilities("", listOf("ま"), 3) }.exceptionOrNull()
+            assertTrue(lookaheadError is CancellationException)
         } finally {
             Thread.interrupted()
         }
         model.cancelPendingInference()
         assertTrue(model.nextLogProbabilities("", listOf("")).single().isNotEmpty())
+        assertEquals(2, model.nextRepeatedLogProbabilities("", listOf("ま"), 2).single().size)
     }
 
     companion object {

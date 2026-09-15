@@ -19,6 +19,7 @@
 | --- | --- |
 | キー配置、グライド、候補一覧、句読点、キーボード切り替え | [操作ガイド](docs/usage.md) |
 | 環境構築、モデル取得、テスト、Lint、APKビルド、CI | [開発手順](docs/development.md) |
+| 変換の処理時間、実端末での内訳計測と再現方法 | [変換時間の調査](docs/performance.md) |
 | UI・IME・エンジンの責務、データ契約、非同期処理 | [全体設計](docs/architecture.md) |
 | 軌跡認識、読みの探索、スコア調整、合成軌跡での検証 | [探索エンジン](docs/engine.md) |
 | ONNXモデル、トークナイザー、取得元、ライセンス | [ひらがな言語モデル](docs/hiragana-model.md) |
