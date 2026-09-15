@@ -3,6 +3,7 @@ package net.ramdos.keyboard_prototype.engine
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -74,5 +75,87 @@ class CandidateSessionTest {
             requireNotNull(deliveries.poll(3, TimeUnit.SECONDS)).invoke()
             assertEquals(listOf("復旧"), received.last().getOrThrow())
         }
+    }
+
+    @Test
+    fun inferenceFailureIsDeliveredAndTheEngineCanHandleTheNextRequest() {
+        val deliveries = LinkedBlockingQueue<() -> Unit>()
+        val failure = IllegalStateException("Inference failed")
+        val received = mutableListOf<Result<List<String>>>()
+        var creations = 0
+        var requests = 0
+        CandidateSession({
+            creations++
+            CandidateEngine {
+                if (++requests == 1) throw failure
+                listOf("復旧")
+            }
+        }, { deliveries.add(it) }).use { session ->
+            session.request(trace, "", received::add)
+            requireNotNull(deliveries.poll(3, TimeUnit.SECONDS)).invoke()
+            assertSame(failure, received.single().exceptionOrNull())
+
+            session.request(trace, "", received::add)
+            requireNotNull(deliveries.poll(3, TimeUnit.SECONDS)).invoke()
+            assertEquals(listOf("復旧"), received.last().getOrThrow())
+            assertEquals(1, creations)
+        }
+    }
+
+    @Test
+    fun missingNativeRuntimeIsDeliveredAsAnInitializationFailure() {
+        val deliveries = LinkedBlockingQueue<() -> Unit>()
+        val failure = UnsatisfiedLinkError("Native runtime unavailable")
+        val received = mutableListOf<Result<List<String>>>()
+        CandidateSession({ throw failure }, { deliveries.add(it) }).use { session ->
+            session.request(trace, "", received::add)
+            requireNotNull(deliveries.poll(3, TimeUnit.SECONDS)).invoke()
+            assertSame(failure, received.single().exceptionOrNull())
+        }
+    }
+
+    @Test
+    fun closeSuppressesQueuedResultsAndDisposesTheEngineExactlyOnce() {
+        val deliveries = LinkedBlockingQueue<() -> Unit>()
+        val disposed = CountDownLatch(1)
+        val closes = AtomicInteger()
+        var shown = false
+        val engine = object : CandidateEngine {
+            override fun generateCandidates(trace: GlideTrace) = listOf("候補")
+            override fun close() {
+                closes.incrementAndGet()
+                disposed.countDown()
+            }
+        }
+        val session = CandidateSession({ engine }, { deliveries.add(it) })
+        try {
+            session.request(trace, "") { shown = true }
+            val callback = requireNotNull(deliveries.poll(3, TimeUnit.SECONDS))
+            session.close()
+            session.close()
+            callback()
+            assertFalse(shown)
+            assertTrue(disposed.await(3, TimeUnit.SECONDS))
+            assertEquals(1, closes.get())
+
+            session.request(trace, "") { shown = true }
+            assertTrue(deliveries.isEmpty())
+            assertFalse(shown)
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
+    fun closingAnUnusedSessionDoesNotInitializeTheEngine() {
+        val creations = AtomicInteger()
+        val session = CandidateSession({
+            creations.incrementAndGet()
+            CandidateEngine { emptyList() }
+        }, { it() })
+        session.close()
+        session.request(trace, "") { fail("Closed sessions must not deliver results") }
+        session.close()
+        assertEquals(0, creations.get())
     }
 }

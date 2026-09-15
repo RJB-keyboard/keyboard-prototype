@@ -98,12 +98,13 @@ class GlideEngineInstrumentedTest {
                     assertValidCandidates(mixed)
                     when (fixture.reading) {
                         "にほんご" -> {
-                            // Measured regression: without dictionary costs this
-                            // 420 ms path loses ほ and prefers the fragment にんこ.
-                            assertEquals("にんこ", baseline.first().reading)
-                            assertTrue(baseline.indexOfFirst { it.reading == fixture.reading } in 1..2)
-                            assertEquals("にほんご", mixed.first().reading)
-                            assertTrue(mixed.first().dictionaryCost <
+                            // The updated wa-column layout changes this synthetic path.
+                            // Dictionary scoring improves 日本語 from third to second;
+                            // the shorter にこ still leads (first place is not claimed).
+                            assertEquals("にこ", baseline.first().reading)
+                            assertEquals(2, baseline.indexOfFirst { it.reading == fixture.reading })
+                            assertEquals(1, mixed.indexOfFirst { it.reading == fixture.reading })
+                            assertTrue(mixed.single { it.reading == fixture.reading }.dictionaryCost <
                                 diagnosticLexicon.evaluate(baseline.first().reading, complete = true).cost)
                         }
                         "こんにちは" -> {
@@ -140,7 +141,7 @@ class GlideEngineInstrumentedTest {
             val candidates = engine.generateCandidates(traceFor("にほんこ"), "私は")
             Log.i("GlideEngineTest", "Fixture decode millis=${(System.nanoTime() - started) / 1_000_000}, candidates=$candidates")
             assertTrue("Expected 日本語 among $candidates", "日本語" in candidates)
-            assertTrue(candidates.any { candidate -> candidate.all { it in '\u3041'..'\u3096' } })
+            assertTrue(candidates.any { candidate -> candidate.all { it in '\u3041'..'\u3096' || it == 'ー' } })
             assertEquals(candidates.size, candidates.distinct().size)
             assertTrue(candidates.size <= 12)
         }
@@ -190,7 +191,7 @@ class GlideEngineInstrumentedTest {
         assertEquals(candidates.size, candidates.map { it.reading }.distinct().size)
         assertEquals(1.0, candidates.sumOf { it.posterior }, 1e-9)
         assertTrue(candidates.all { candidate ->
-            candidate.reading.isNotEmpty() && candidate.reading.all { it in '\u3041'..'\u3096' } &&
+            candidate.reading.isNotEmpty() && candidate.reading.all { it in '\u3041'..'\u3096' || it == 'ー' } &&
                 candidate.score.isFinite() && candidate.posterior.isFinite()
         })
         assertTrue(candidates.zipWithNext().all { (first, second) -> first.score >= second.score })

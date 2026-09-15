@@ -8,7 +8,7 @@ powershell -ExecutionPolicy Bypass -File tools/prepare_hiragana_model.ps1
 
 固定リビジョンは `b0ef59dcdfd8eaddc3010cb8a2060c6196bba573`。取得ファイルはすべてスクリプト内の SHA-256 と照合する。重みは 84,652,543 バイトで `app/src/main/assets/models/hiragana-gpt2-xsmall/model.onnx` に保存される。大きな ONNX バイナリは Git 管理外なので、別のチェックアウトではビルド前に上記を実行する。アプリ初回ロード時にも重みのハッシュを検証し、アプリ専用・バックアップ対象外の領域にコピーする。
 
-Android 依存は `com.microsoft.onnxruntime:onnxruntime-android:1.23.2`。`OnnxHiraganaLanguageModel.open(context)` はモデルのロードを行うため、ワーカースレッドから呼ぶ。ファイル欠落、ハッシュ不一致、推論エラーを疑似 LLM に置き換えない。
+Android 依存は `com.microsoft.onnxruntime:onnxruntime-android:1.30.0`。`OnnxHiraganaLanguageModel.open(context)` はモデルのロードを行うため、ワーカースレッドから呼ぶ。ファイル欠落、ハッシュ不一致、推論エラーを疑似 LLM に置き換えない。
 
 ONNX の入力は `input_ids`, `attention_mask`, `position_ids` の 3 個で、それぞれ int64 の `[batch_size, sequence_length]`。出力 `logits` は float32 の `[batch_size, sequence_length, 94]`。公開ファイルには KV cache の入出力がないため、ビームの接頭辞を最大 16 件ずつまとめ、過去文脈＋接頭辞の末尾 96 トークンを再計算する。右パディングと attention mask を使い、各行の最後の実トークン位置の logits を読む。位置 ID も明示する。上限はコンストラクタ引数で調整でき、モデル自身の上限は 1024。
 

@@ -4,7 +4,7 @@ import android.view.ContextThemeWrapper
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
-import android.widget.LinearLayout
+import android.widget.GridLayout
 import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -53,7 +53,7 @@ class GlideKeyboardViewTest {
         }
         keyboard.onTraceCompleted = { keyboard.showCandidates(engine.generateCandidates(it)) }
         keyboard.onCandidateSelected = { selections.add(it); keyboard.reset() }
-        val row = keyboard.findViewById<LinearLayout>(R.id.candidate_row)
+        val row = keyboard.findViewById<GridLayout>(R.id.candidate_row)
 
         touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
         assertTrue(requests.isEmpty())
@@ -74,8 +74,229 @@ class GlideKeyboardViewTest {
         assertEquals(2, requests.size)
         assertEquals(2, requests[0].points.size)
         assertEquals(3, requests[1].points.size)
-        assertEquals(46, requests[1].keys.size)
+        assertEquals(47, requests[1].keys.size)
         assertEquals(listOf("あ", "い"), StubCandidateEngine().generateCandidates(requests[1]))
+    }
+
+    @Test
+    fun keyboardSwitchAndPickerCancelTraceWithoutCommittingCandidates() = withKeyboard { keyboard, board ->
+        var switches = 0
+        var pickers = 0
+        var commits = 0
+        var traces = 0
+        keyboard.onSwitchKeyboard = { switches++ }
+        keyboard.onChooseKeyboard = { pickers++ }
+        keyboard.onCandidateSelected = { commits++ }
+        keyboard.onTraceCompleted = { traces++ }
+        val key = keyboard.findViewById<Button>(R.id.switch_keyboard_key)
+        for (longPress in listOf(false, true)) {
+            touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
+            keyboard.showCandidates(listOf("未確定"))
+            if (longPress) assertTrue(key.performLongClick()) else key.performClick()
+            assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+            touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
+        }
+        assertEquals(1, switches)
+        assertEquals(1, pickers)
+        assertEquals(0, commits)
+        assertEquals(0, traces)
+        assertTrue(key.bottom <= keyboard.findViewById<View>(R.id.backspace_key).top)
+    }
+
+    @Test
+    fun backspaceClearsCandidatesAndCancelsAnActiveTrace() = withKeyboard { keyboard, board ->
+        var deletions = 0
+        var traces = 0
+        keyboard.onBackspace = { deletions++ }
+        keyboard.onTraceCompleted = { traces++ }
+        val key = keyboard.findViewById<Button>(R.id.backspace_key)
+        keyboard.showCandidates(listOf("あ", "い"))
+        key.performClick()
+        assertEquals(1, deletions)
+        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        assertEquals(View.VISIBLE, keyboard.findViewById<TextView>(R.id.candidate_hint).visibility)
+
+        touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
+        key.performClick()
+        touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
+        assertEquals(2, deletions)
+        assertEquals(0, traces)
+    }
+
+    @Test
+    fun spaceClearsCandidatesAndCancelsAnActiveTrace() = withKeyboard { keyboard, board ->
+        var spaces = 0
+        var traces = 0
+        keyboard.onSpace = { spaces++ }
+        keyboard.onTraceCompleted = { traces++ }
+        val key = keyboard.findViewById<Button>(R.id.space_key)
+        keyboard.showCandidates(listOf("あ", "い"))
+        key.performClick()
+        assertEquals(1, spaces)
+        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        assertEquals(View.VISIBLE, keyboard.findViewById<TextView>(R.id.candidate_hint).visibility)
+
+        touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
+        key.performClick()
+        touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
+        assertEquals(2, spaces)
+        assertEquals(0, traces)
+    }
+
+    @Test
+    fun enterClearsCandidatesAndCancelsTraceFromTheBottomRow() = withKeyboard { keyboard, board ->
+        var enters = 0
+        var traces = 0
+        keyboard.onEnter = { enters++ }
+        keyboard.onTraceCompleted = { traces++ }
+        val key = keyboard.findViewById<Button>(R.id.enter_key)
+        val left = keyboard.findViewById<Button>(R.id.cursor_left_key)
+        val right = keyboard.findViewById<Button>(R.id.cursor_right_key)
+        val keyBounds = android.graphics.Rect()
+        key.getDrawingRect(keyBounds)
+        keyboard.offsetDescendantRectToMyCoords(key, keyBounds)
+        assertTrue(keyBounds.top >= board.bottom)
+        val space = keyboard.findViewById<Button>(R.id.space_key)
+        val punctuation = keyboard.findViewById<Button>(R.id.punctuation_key)
+        assertTrue(left.right <= punctuation.left)
+        assertTrue(punctuation.right <= space.left)
+        assertTrue(space.right <= key.left)
+        assertTrue(key.right <= right.left)
+        assertTrue(kotlin.math.abs(left.width - right.width) <= 1)
+        assertTrue(kotlin.math.abs(space.width - 2 * left.width) <= 2)
+        assertTrue(kotlin.math.abs(key.width - space.width) <= 1)
+        assertEquals((48 * keyboard.resources.displayMetrics.density).toInt(), key.height)
+        keyboard.setEnterLabel("検索")
+        assertEquals("検索", key.text.toString())
+        assertEquals("検索", key.contentDescription.toString())
+        keyboard.showCandidates(listOf("あ", "い"))
+        key.performClick()
+        assertEquals(1, enters)
+        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
+        key.performClick()
+        touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
+        assertEquals(2, enters)
+        assertEquals(0, traces)
+    }
+
+    @Test
+    fun cursorKeysClearCandidatesAndCancelActiveTraces() = withKeyboard { keyboard, board ->
+        val moves = mutableListOf<String>()
+        var traces = 0
+        keyboard.onCursorLeft = { moves.add("left") }
+        keyboard.onCursorRight = { moves.add("right") }
+        keyboard.onTraceCompleted = { traces++ }
+        for (id in listOf(R.id.cursor_left_key, R.id.cursor_right_key)) {
+            keyboard.showCandidates(listOf("候補"))
+            keyboard.findViewById<Button>(id).performClick()
+            assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+            touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
+            keyboard.findViewById<Button>(id).performClick()
+            touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
+        }
+        assertEquals(listOf("left", "left", "right", "right"), moves)
+        assertEquals(0, traces)
+    }
+
+    @Test
+    fun deleteStaysAboveBoardAndOutsideTwoCandidateRows() = withKeyboard { keyboard, board ->
+        keyboard.showCandidates(listOf("一", "二", "長い候補の表示", "四"))
+        keyboard.measure(View.MeasureSpec.makeMeasureSpec(1100, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+        keyboard.layout(0, 0, keyboard.measuredWidth, keyboard.measuredHeight)
+        fun bounds(id: Int): android.graphics.Rect {
+            val view = keyboard.findViewById<View>(id)
+            return android.graphics.Rect().also {
+                view.getDrawingRect(it)
+                keyboard.offsetDescendantRectToMyCoords(view, it)
+            }
+        }
+        val delete = bounds(R.id.backspace_key)
+        val candidates = bounds(R.id.candidate_scroll)
+        assertTrue(delete.bottom <= board.top)
+        assertEquals(candidates.bottom, delete.bottom)
+        assertTrue(candidates.right <= delete.left)
+        val row = keyboard.findViewById<GridLayout>(R.id.candidate_row)
+        assertEquals(row.getChildAt(0).top, row.getChildAt(2).top)
+        assertEquals(row.getChildAt(1).top, row.getChildAt(3).top)
+        assertTrue(row.getChildAt(0).bottom <= row.getChildAt(1).top)
+        keyboard.setEnterLabel(keyboard.context.getString(R.string.enter_newline))
+        val enter = keyboard.findViewById<Button>(R.id.enter_key)
+        assertEquals("改行", enter.text.toString())
+        assertEquals("改行", enter.contentDescription.toString())
+    }
+
+    @Test
+    fun navigationInsetsReserveSpaceWithoutAccumulatingPadding() = withKeyboard { keyboard, _ ->
+        val insets = androidx.core.view.WindowInsetsCompat.Builder()
+            .setInsets(
+                androidx.core.view.WindowInsetsCompat.Type.navigationBars(),
+                androidx.core.graphics.Insets.of(12, 0, 8, 64),
+            ).build()
+        repeat(2) {
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(keyboard, insets)
+            assertEquals(12, keyboard.paddingLeft)
+            assertEquals(8, keyboard.paddingRight)
+            assertEquals(maxOf(64, (48 * keyboard.resources.displayMetrics.density).toInt()) +
+                (8 * keyboard.resources.displayMetrics.density).toInt(), keyboard.paddingBottom)
+        }
+        val cleared = androidx.core.view.WindowInsetsCompat.Builder()
+            .setInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.NONE)
+            .build()
+        androidx.core.view.ViewCompat.dispatchApplyWindowInsets(keyboard, cleared)
+        assertEquals((48 * keyboard.resources.displayMetrics.density).toInt() +
+            (8 * keyboard.resources.displayMetrics.density).toInt(), keyboard.paddingBottom)
+        assertEquals(0, keyboard.paddingLeft)
+        assertEquals(0, keyboard.paddingRight)
+    }
+
+    @Test
+    fun allKeysStayOutsideCaptionAndSideNavigationAreasInBothOrientations() = withKeyboard { keyboard, _ ->
+        val density = keyboard.resources.displayMetrics.density
+        keyboard.showCandidates(listOf("あ", "い"))
+        val captionHeight = (80 * density).toInt()
+        for (width in listOf(1100, 2200)) {
+            val sideWidth = if (width == 2200) 100 else 0
+            val insets = androidx.core.view.WindowInsetsCompat.Builder()
+                .setInsetsIgnoringVisibility(androidx.core.view.WindowInsetsCompat.Type.captionBar(),
+                    androidx.core.graphics.Insets.of(0, 0, 0, captionHeight))
+                .setInsetsIgnoringVisibility(androidx.core.view.WindowInsetsCompat.Type.navigationBars(),
+                    androidx.core.graphics.Insets.of(0, 0, sideWidth, 24))
+                .build()
+            androidx.core.view.ViewCompat.dispatchApplyWindowInsets(keyboard, insets)
+            keyboard.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            keyboard.layout(0, 0, width, keyboard.measuredHeight)
+            fun checkKeys(view: View) {
+                if (view.isClickable && view.visibility == View.VISIBLE) {
+                    val bounds = android.graphics.Rect()
+                    view.getDrawingRect(bounds)
+                    keyboard.offsetDescendantRectToMyCoords(view, bounds)
+                    assertTrue("Key overlaps system band: $bounds",
+                        bounds.bottom <= keyboard.height - captionHeight - (8 * density).toInt())
+                    assertTrue("Key overlaps side navigation: $bounds", bounds.right <= width - sideWidth)
+                }
+                if (view is android.view.ViewGroup) {
+                    for (i in 0 until view.childCount) checkKeys(view.getChildAt(i))
+                }
+            }
+            checkKeys(keyboard)
+        }
+    }
+
+    @Test
+    fun longVowelBelowWaWoNSubmitsTrace() = withKeyboard { keyboard, board ->
+        val requests = mutableListOf<GlideTrace>()
+        keyboard.onTraceCompleted = { requests.add(it) }
+        for ((index, y) in listOf(0.9f).withIndex()) {
+            touch(board, MotionEvent.ACTION_DOWN, 0.05f, y, 100L + index * 100)
+            touch(board, MotionEvent.ACTION_UP, 0.05f, y, 120L + index * 100)
+        }
+        assertEquals(listOf("ー"), requests.map { trace ->
+            val point = trace.points.first()
+            trace.keys.single { it.contains(point.x, point.y) }.kana
+        })
     }
 
     @Test
@@ -101,7 +322,7 @@ class GlideKeyboardViewTest {
     fun cancellationOutsideReleaseAndResetDoNotProduceCandidates() = withKeyboard { keyboard, board ->
         var completed = 0
         keyboard.onTraceCompleted = { completed++; keyboard.showCandidates(listOf("あ", "い")) }
-        val row = keyboard.findViewById<LinearLayout>(R.id.candidate_row)
+        val row = keyboard.findViewById<GridLayout>(R.id.candidate_row)
         touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
         touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
         assertEquals(2, row.childCount)
@@ -152,8 +373,8 @@ class GlideKeyboardViewTest {
     fun blanksAreIgnoredAndAccessibleKeyClicksSubmitATap() = withKeyboard { keyboard, board ->
         val requests = mutableListOf<GlideTrace>()
         keyboard.onTraceCompleted = { requests.add(it) }
-        touch(board, MotionEvent.ACTION_DOWN, 0.5f / 10, 0.3f, 100)
-        touch(board, MotionEvent.ACTION_UP, 0.5f / 10, 0.3f, 120)
+        touch(board, MotionEvent.ACTION_DOWN, 0.5f / 10, 0.7f, 100)
+        touch(board, MotionEvent.ACTION_UP, 0.5f / 10, 0.7f, 120)
         assertTrue(requests.isEmpty())
         val key = (0 until board.childCount).map { board.getChildAt(it) as TextView }.first { it.text == "ん" }
         key.performClick()

@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.drawable.GradientDrawable
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.Gravity
 import android.view.MotionEvent
@@ -14,6 +15,7 @@ import android.widget.TextView
 import net.ramdos.keyboard_prototype.engine.GlideTrace
 import net.ramdos.keyboard_prototype.engine.KanaKey
 import net.ramdos.keyboard_prototype.engine.TracePoint
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /** Collects touches and renders the board; never generates or commits candidates. */
@@ -27,12 +29,12 @@ class GojuonBoardView @JvmOverloads constructor(
 
     private val points = mutableListOf<TracePoint>()
     private val path = Path()
+    private val trailLifetimeMillis = 450L
+    private val trailRadius = 2.5f * resources.displayMetrics.density
+    private var firstVisiblePoint = 0
     private val tracePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(160, 37, 99, 235)
-        style = Paint.Style.STROKE
-        strokeWidth = 3 * resources.displayMetrics.density
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
+        style = Paint.Style.FILL
     }
     private var activePointerId = MotionEvent.INVALID_POINTER_ID
     private var startedAt = 0L
@@ -42,6 +44,7 @@ class GojuonBoardView @JvmOverloads constructor(
             text = key.kana
             textSize = 20f
             gravity = Gravity.CENTER
+            includeFontPadding = false
             isFocusable = true
             setTextColor(Color.rgb(23, 33, 46))
             background = GradientDrawable().apply {
@@ -144,7 +147,6 @@ class GojuonBoardView @JvmOverloads constructor(
 
     private fun append(x: Float, y: Float, time: Long) {
         points.add(TracePoint(x / width, y / height, time - startedAt))
-        if (points.size == 1) path.moveTo(x, y) else path.lineTo(x, y)
     }
 
     private fun highlight(key: KanaKey?) {
@@ -156,6 +158,7 @@ class GojuonBoardView @JvmOverloads constructor(
     private fun submitKeyTap(key: KanaKey) {
         clearTrace()
         onGestureStarted?.invoke()
+        startedAt = SystemClock.uptimeMillis()
         points.add(TracePoint((key.left + key.right) / 2, (key.top + key.bottom) / 2, 0))
         highlight(key)
         invalidate()
@@ -166,6 +169,7 @@ class GojuonBoardView @JvmOverloads constructor(
         activePointerId = MotionEvent.INVALID_POINTER_ID
         parent?.requestDisallowInterceptTouchEvent(false)
         points.clear()
+        firstVisiblePoint = 0
         path.reset()
         highlight(null)
         invalidate()
@@ -188,9 +192,58 @@ class GojuonBoardView @JvmOverloads constructor(
 
     override fun dispatchDraw(canvas: Canvas) {
         super.dispatchDraw(canvas)
-        canvas.drawPath(path, tracePaint)
-        points.lastOrNull()?.let {
-            canvas.drawCircle(it.x * width, it.y * height, 5 * resources.displayMetrics.density, tracePaint)
+        drawTrail(canvas, SystemClock.uptimeMillis())
+    }
+
+    private fun drawTrail(canvas: Canvas, now: Long) {
+        path.rewind()
+        val cutoff = now - startedAt - trailLifetimeMillis
+        // Retain the complete trace for decoding; only advance the rendering window.
+        while (firstVisiblePoint < points.size &&
+            points[firstVisiblePoint].elapsedMillis <= cutoff) {
+            firstVisiblePoint++
         }
+        if (firstVisiblePoint == points.size) return
+
+        var previousX = 0f
+        var previousY = 0f
+        var previousRadius = 0f
+        val startIndex = maxOf(0, firstVisiblePoint - 1)
+        for (index in startIndex until points.size) {
+            val point = points[index]
+            var x = point.x * width
+            var y = point.y * height
+            if (index < firstVisiblePoint) {
+                // Clip the crossing segment at the cutoff so its tail retreats smoothly.
+                val next = points[index + 1]
+                val fraction = (cutoff - point.elapsedMillis).toFloat() /
+                    (next.elapsedMillis - point.elapsedMillis)
+                x += (next.x * width - x) * fraction
+                y += (next.y * height - y) * fraction
+            }
+            val radius = trailRadius *
+                ((point.elapsedMillis - cutoff).toFloat() / trailLifetimeMillis).coerceIn(0f, 1f)
+            if (index > startIndex) {
+                val dx = x - previousX
+                val dy = y - previousY
+                val length = hypot(dx, dy)
+                if (length > 0f) {
+                    val nx = dy / length
+                    val ny = -dx / length
+                    path.moveTo(previousX + nx * previousRadius, previousY + ny * previousRadius)
+                    path.lineTo(x + nx * radius, y + ny * radius)
+                    path.lineTo(x - nx * radius, y - ny * radius)
+                    path.lineTo(previousX - nx * previousRadius, previousY - ny * previousRadius)
+                    path.close()
+                }
+            }
+            if (radius > 0f) path.addCircle(x, y, radius, Path.Direction.CW)
+            previousX = x
+            previousY = y
+            previousRadius = radius
+        }
+        // One filled path keeps joins and crossings at a consistent opacity.
+        canvas.drawPath(path, tracePaint)
+        postInvalidateOnAnimation()
     }
 }

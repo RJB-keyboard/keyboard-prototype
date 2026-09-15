@@ -146,6 +146,16 @@ class GlideDecoderTest {
     }
 
     @Test
+    fun longVowelKeyDecodesWithLanguageModelOnTheActualLayout() {
+        val key = GojuonLayout.keys.single { it.kana == "ー" }
+        val trace = GlideTrace(listOf(TracePoint(
+            (key.left + key.right) / 2, (key.top + key.bottom) / 2, 0,
+        )), GojuonLayout.keys)
+        val model = RecordingModel { _, _ -> mapOf('ー' to 0.0) }
+        assertEquals("ー", GlideDecoder(languageModel = model).decode(trace).first().reading)
+    }
+
+    @Test
     fun rejectsNonfiniteNonmonotonicAndOutsideInputWithoutCallingLanguageModel() {
         val model = RecordingModel()
         val decoder = GlideDecoder(geometry, model)
