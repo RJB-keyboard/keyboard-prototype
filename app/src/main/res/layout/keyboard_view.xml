@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merge xmlns:android="http://schemas.android.com/apk/res/android">
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -91,6 +92,7 @@
         android:layout_marginEnd="4dp"
         android:layout_marginBottom="4dp" />
 
+    <!-- These are keyboard keys, not dialog actions: keep their bounded backgrounds. -->
     <LinearLayout
         android:id="@+id/action_row"
         android:layout_width="match_parent"
@@ -99,7 +101,8 @@
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="4dp"
         android:layoutDirection="ltr"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        tools:ignore="ButtonStyle">
         <Button
             android:id="@+id/cursor_left_key"
             android:layout_width="0dp"
