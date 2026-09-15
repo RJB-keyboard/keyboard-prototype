@@ -1,5 +1,7 @@
 # オフラインかな漢字変換
 
+[READMEに戻る](../README.md) · [全体設計](architecture.md) · [開発手順](development.md)
+
 `SumireKanaKanjiConverter.open(context)` は、同梱辞書を読み込み、
 `convert(reading, limit)` でかな漢字交じりの候補を返す。
 `convertCandidates(reading, limit)` は表記とスケール済みの変換コストを返す。
