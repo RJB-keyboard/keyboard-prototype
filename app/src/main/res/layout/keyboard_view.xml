@@ -1,33 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <merge xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingStart="12dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="12dp"
-        android:text="@string/candidate_title"
-        android:textColor="#42516A"
-        android:textSize="12sp" />
-
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="96dp"
-        android:orientation="horizontal"
         android:paddingStart="8dp"
         android:paddingEnd="8dp">
 
         <FrameLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="1">
+            android:layout_marginEnd="56dp">
 
             <TextView
                 android:id="@+id/candidate_hint"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:gravity="center_vertical"
+                android:gravity="center"
+                android:includeFontPadding="false"
                 android:text="@string/candidate_hint"
                 android:textColor="#42516A"
                 android:textSize="14sp" />
@@ -37,19 +27,61 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:scrollbars="none"
+                android:fillViewport="true"
                 android:visibility="gone">
+
+                <FrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent">
 
                 <GridLayout
                     android:id="@+id/candidate_row"
+                    android:layout_gravity="center_horizontal"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:orientation="vertical"
                     android:rowCount="2" />
+                </FrameLayout>
             </HorizontalScrollView>
         </FrameLayout>
 
+        <Button
+            android:id="@+id/switch_keyboard_key"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="top|end"
+            android:minWidth="0dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
+            android:singleLine="true"
+            android:backgroundTint="#D7E7FF"
+            android:contentDescription="@string/switch_keyboard_description"
+            android:text="@string/switch_keyboard_key"
+            android:textAllCaps="false"
+            android:textColor="#17212E"
+            android:textSize="14sp" />
 
-    </LinearLayout>
+        <Button
+            android:id="@+id/backspace_key"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="bottom|end"
+            android:minWidth="0dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:backgroundTint="#FFFFFF"
+            android:contentDescription="@string/backspace_description"
+            android:text="@string/backspace_key"
+            android:textAllCaps="false"
+            android:textColor="#17212E"
+            android:textSize="16sp" />
+    </FrameLayout>
 
     <net.ramdos.keyboard_prototype.ui.GojuonBoardView
         android:id="@+id/gojuon_board"
@@ -69,27 +101,55 @@
         android:layoutDirection="ltr"
         android:orientation="horizontal">
         <Button
-            android:id="@+id/backspace_key"
+            android:id="@+id/cursor_left_key"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:minWidth="0dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:singleLine="true"
             android:ellipsize="end"
             android:backgroundTint="#FFFFFF"
-            android:contentDescription="@string/backspace_description"
-            android:text="@string/backspace_key"
+            android:contentDescription="@string/cursor_left_description"
+            android:text="@string/cursor_left_key"
             android:textAllCaps="false"
             android:textColor="#17212E"
-            android:textSize="16sp" />
+            android:textSize="28sp" />
+        <Button
+            android:id="@+id/punctuation_key"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="0dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:backgroundTint="#FFFFFF"
+            android:contentDescription="@string/punctuation_description"
+            android:text="@string/punctuation_key"
+            android:textAllCaps="false"
+            android:textColor="#17212E"
+            android:textSize="20sp" />
         <Button
             android:id="@+id/space_key"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="2"
             android:minWidth="0dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:singleLine="true"
@@ -104,8 +164,12 @@
             android:id="@+id/enter_key"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_weight="2"
             android:minWidth="0dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:singleLine="true"
@@ -115,7 +179,27 @@
             android:text="@string/enter_newline"
             android:textAllCaps="false"
             android:textColor="#17212E"
-            android:textSize="16sp" />
+            android:textSize="24sp" />
+        <Button
+            android:id="@+id/cursor_right_key"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="0dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:backgroundTint="#FFFFFF"
+            android:contentDescription="@string/cursor_right_description"
+            android:text="@string/cursor_right_key"
+            android:textAllCaps="false"
+            android:textColor="#17212E"
+            android:textSize="28sp" />
     </LinearLayout>
 
 </merge>

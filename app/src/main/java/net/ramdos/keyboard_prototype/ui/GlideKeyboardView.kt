@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
 import android.view.LayoutInflater
+import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.GridLayout
@@ -24,9 +25,14 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     var onCandidateSelected: ((String) -> Unit)? = null
     var onGestureStarted: (() -> Unit)? = null
     var onGestureCancelled: (() -> Unit)? = null
+    var onPunctuation: (() -> Unit)? = null
     var onSpace: (() -> Unit)? = null
     var onEnter: (() -> Unit)? = null
+    var onCursorLeft: (() -> Unit)? = null
+    var onCursorRight: (() -> Unit)? = null
     var onBackspace: (() -> Unit)? = null
+    var onSwitchKeyboard: (() -> Unit)? = null
+    var onChooseKeyboard: (() -> Unit)? = null
 
     private val board: GojuonBoardView
     private val candidateRow: GridLayout
@@ -70,15 +76,41 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         candidateScroll = findViewById(R.id.candidate_scroll)
         hint = findViewById(R.id.candidate_hint)
         bindBackspaceKey()
+        findViewById<Button>(R.id.switch_keyboard_key).apply {
+            setOnClickListener {
+                reset()
+                onSwitchKeyboard?.invoke()
+            }
+            setOnLongClickListener {
+                reset()
+                onChooseKeyboard?.invoke()
+                true
+            }
+        }
 
         findViewById<Button>(R.id.enter_key).setOnClickListener {
             reset()
             onEnter?.invoke()
         }
 
+        findViewById<Button>(R.id.punctuation_key).setOnClickListener {
+            reset()
+            onPunctuation?.invoke()
+            showCandidates(listOf("、", "。"))
+        }
+
         findViewById<Button>(R.id.space_key).setOnClickListener {
             reset()
             onSpace?.invoke()
+        }
+
+        findViewById<Button>(R.id.cursor_left_key).setOnClickListener {
+            reset()
+            onCursorLeft?.invoke()
+        }
+        findViewById<Button>(R.id.cursor_right_key).setOnClickListener {
+            reset()
+            onCursorRight?.invoke()
         }
 
         board.onGestureStarted = {
@@ -98,8 +130,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     private fun bindBackspaceKey() {
         backspaceKey = findViewById(R.id.backspace_key)
         backspaceKey.setOnClickListener {
-            board.clearTrace()
-            showCandidates(emptyList())
+            clearPendingInput()
             onBackspace?.invoke()
         }
         backspaceKey.setOnTouchListener { view, event ->
@@ -131,6 +162,9 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             candidateRow.addView(Button(context).apply {
                 text = candidate
                 textSize = 22f
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                setPadding(paddingLeft, 0, paddingRight, 0)
                 isAllCaps = false
                 setTextColor(Color.rgb(23, 33, 46))
                 backgroundTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
@@ -172,6 +206,11 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
 
     fun reset() {
         stopBackspaceRepeat()
+        clearPendingInput()
+    }
+
+    /** Selection updates also follow our own deletions; keep an active key hold. */
+    fun clearPendingInput() {
         board.clearTrace()
         showCandidates(emptyList())
     }

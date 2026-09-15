@@ -104,4 +104,30 @@ class BackspaceRepeatTest {
             main { assertEquals(2, deletions) }
         } finally { main { keyboard.reset() } }
     }
+
+    @Test fun selectionUpdatesAfterEachDeletionKeepRepeatingUntilRelease() {
+        setup()
+        try {
+            main {
+                keyboard.onBackspace = {
+                    deletions++
+                    // The IME clears pending input when a deletion moves the cursor.
+                    keyboard.clearPendingInput()
+                }
+                touch(MotionEvent.ACTION_DOWN)
+                assertEquals(1, deletions)
+                assertTrue(key.isPressed)
+            }
+            SystemClock.sleep(650)
+            var count = 0
+            main {
+                assertTrue("Selection updates must not stop a hold", deletions >= 3)
+                count = deletions
+                touch(MotionEvent.ACTION_UP)
+                assertFalse(key.isPressed)
+            }
+            SystemClock.sleep(550)
+            main { assertEquals(count, deletions) }
+        } finally { main { keyboard.reset() } }
+    }
 }
