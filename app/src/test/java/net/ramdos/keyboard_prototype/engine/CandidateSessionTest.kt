@@ -33,9 +33,9 @@ class CandidateSessionTest {
         }
         val session = CandidateSession({ engine }, { deliveries.add(it) })
         try {
-            session.request(trace, "古い") { received.addAll(it.getOrThrow()) }
+            session.request(trace, "古い") { received.addAll(it.getOrThrow().map { candidate -> candidate.text }) }
             assertTrue(entered.await(3, TimeUnit.SECONDS))
-            session.request(trace, "新しい") { received.addAll(it.getOrThrow()) }
+            session.request(trace, "新しい") { received.addAll(it.getOrThrow().map { candidate -> candidate.text }) }
             release.countDown()
             repeat(2) { requireNotNull(deliveries.poll(3, TimeUnit.SECONDS)).invoke() }
             assertEquals(listOf("新しい"), received)
@@ -44,6 +44,22 @@ class CandidateSessionTest {
             session.close()
         }
         assertTrue(disposed.await(3, TimeUnit.SECONDS))
+    }
+
+    @Test
+    fun deliversConfidenceWithoutCallingTheStringOnlyPath() {
+        val deliveries = LinkedBlockingQueue<() -> Unit>()
+        val expected = listOf(DisplayCandidate("候補", 0.75))
+        val engine = object : CandidateEngine {
+            override fun generateCandidates(trace: GlideTrace): List<String> = error("Use scored candidates")
+            override fun generateScoredCandidates(trace: GlideTrace, precedingText: String) = expected
+        }
+        CandidateSession({ engine }, { deliveries.add(it) }).use { session ->
+            var received: List<DisplayCandidate>? = null
+            session.request(trace, "") { received = it.getOrThrow() }
+            requireNotNull(deliveries.poll(3, TimeUnit.SECONDS)).invoke()
+            assertEquals(expected, received)
+        }
     }
 
     @Test
@@ -63,7 +79,7 @@ class CandidateSessionTest {
     fun modelInitializationFailureIsVisibleAndCanBeRetried() {
         val deliveries = LinkedBlockingQueue<() -> Unit>()
         var attempts = 0
-        val received = mutableListOf<Result<List<String>>>()
+        val received = mutableListOf<Result<List<DisplayCandidate>>>()
         CandidateSession({
             if (++attempts == 1) throw IllegalStateException("Model unavailable")
             CandidateEngine { listOf("復旧") }
@@ -73,7 +89,7 @@ class CandidateSessionTest {
             assertTrue(received.single().isFailure)
             session.request(trace, "", received::add)
             requireNotNull(deliveries.poll(3, TimeUnit.SECONDS)).invoke()
-            assertEquals(listOf("復旧"), received.last().getOrThrow())
+            assertEquals(listOf("復旧"), received.last().getOrThrow().map { it.text })
         }
     }
 
@@ -81,7 +97,7 @@ class CandidateSessionTest {
     fun inferenceFailureIsDeliveredAndTheEngineCanHandleTheNextRequest() {
         val deliveries = LinkedBlockingQueue<() -> Unit>()
         val failure = IllegalStateException("Inference failed")
-        val received = mutableListOf<Result<List<String>>>()
+        val received = mutableListOf<Result<List<DisplayCandidate>>>()
         var creations = 0
         var requests = 0
         CandidateSession({
@@ -97,7 +113,7 @@ class CandidateSessionTest {
 
             session.request(trace, "", received::add)
             requireNotNull(deliveries.poll(3, TimeUnit.SECONDS)).invoke()
-            assertEquals(listOf("復旧"), received.last().getOrThrow())
+            assertEquals(listOf("復旧"), received.last().getOrThrow().map { it.text })
             assertEquals(1, creations)
         }
     }
@@ -106,7 +122,7 @@ class CandidateSessionTest {
     fun missingNativeRuntimeIsDeliveredAsAnInitializationFailure() {
         val deliveries = LinkedBlockingQueue<() -> Unit>()
         val failure = UnsatisfiedLinkError("Native runtime unavailable")
-        val received = mutableListOf<Result<List<String>>>()
+        val received = mutableListOf<Result<List<DisplayCandidate>>>()
         CandidateSession({ throw failure }, { deliveries.add(it) }).use { session ->
             session.request(trace, "", received::add)
             requireNotNull(deliveries.poll(3, TimeUnit.SECONDS)).invoke()

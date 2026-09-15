@@ -21,8 +21,8 @@ GlideCandidateEngine
          ↓ Sumireの辞書・接続コスト・Viterbi/A*でかな漢字変換
          ↓ 漢字かな交じりの文字n-gramで上位20候補を再評価
          ↓ 読み間の表記文脈も比較し、近い読みの代表を最大3件先頭へ
-    ↓ List<String>（変換候補＋最上位の読みそのもの）
-GlideKeyboardView.showCandidates
+    ↓ List<DisplayCandidate>（変換候補＋最上位の読みそのもの、確からしさ付き）
+GlideKeyboardView.showScoredCandidates
     ↓ 候補をタップ → onCandidateSelected
 JapaneseInputMethodService → InputConnection.commitText
 ```
@@ -49,7 +49,8 @@ Kotlinファイルは [app/src/main/java/net/ramdos/keyboard_prototype/](../app/
 - `TracePoint.x/y`: 五十音表全体の左上を `(0, 0)`、右下を `(1, 1)` とした座標。途中で表の外へ出た点も丸めずに保持します。
 - `TracePoint.elapsedMillis`: 指を置いた時点からの経過ミリ秒。バッチ化された移動履歴も保持します。
 - `GlideTrace.keys`: その軌跡で使用した文字と矩形領域。描画と同じ正規化座標を使います。
-- 戻り値は候補順の `List<String>`。空なら候補を表示しません。
+- `generateScoredCandidates` の戻り値は候補順の `List<DisplayCandidate>`。`text` と相対的な確からしさ `confidence`（0〜1、不明ならnull）を渡します。空なら候補を表示しません。文字列のみの `generateCandidates` も維持します。
+- エンジンで確からしさを算出し、UIはその値を薄い青（0）〜薄い緑（1）へ線形補間します。候補の並び順からは色を決めません。算出方法と制約は [変換候補の背景色](conversion.md#候補の背景色) を参照してください。
 
 ## 推論とセッション管理
 

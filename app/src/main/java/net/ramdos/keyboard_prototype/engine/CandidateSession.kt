@@ -19,7 +19,7 @@ class CandidateSession(
     @Volatile private var engine: CandidateEngine? = null // only cancellation crosses threads
     private var closed = false
 
-    fun request(trace: GlideTrace, precedingText: String, deliver: (Result<List<String>>) -> Unit) {
+    fun request(trace: GlideTrace, precedingText: String, deliver: (Result<List<DisplayCandidate>>) -> Unit) {
         if (closed) return
         invalidate()
         val requestId = generation.get()
@@ -27,7 +27,7 @@ class CandidateSession(
             val result = try {
                 val activeEngine = engine ?: createEngine().also { engine = it }
                 if (generation.get() != requestId) return@submit
-                Result.success(activeEngine.generateCandidates(trace, precedingText))
+                Result.success(activeEngine.generateScoredCandidates(trace, precedingText))
             } catch (_: InterruptedException) {
                 return@submit
             } catch (exception: Exception) {

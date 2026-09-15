@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#B9D5F5">
-    <item>
+    <item android:id="@+id/candidate_fill">
         <shape android:shape="rectangle">
             <solid android:color="#FFFFFF" />
             <stroke android:width="0.5dp" android:color="#B8C3D0" />

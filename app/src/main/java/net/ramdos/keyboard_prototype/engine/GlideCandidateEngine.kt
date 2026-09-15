@@ -1,5 +1,7 @@
 package net.ramdos.keyboard_prototype.engine
 
+import kotlin.math.exp
+
 /** Pipeline: geometry + next-kana LM -> readings -> dictionary-based conversion. */
 class GlideCandidateEngine(
     private val languageModel: KanaLanguageModel,
@@ -24,16 +26,22 @@ class GlideCandidateEngine(
 
     override fun generateCandidates(trace: GlideTrace): List<String> = generateCandidates(trace, "")
 
-    override fun generateCandidates(trace: GlideTrace, precedingText: String): List<String> {
+    override fun generateCandidates(trace: GlideTrace, precedingText: String): List<String> =
+        generateScoredCandidates(trace, precedingText).map { it.text }
+
+    override fun generateScoredCandidates(trace: GlideTrace, precedingText: String): List<DisplayCandidate> {
         checkCancellation()
         val context = if (precedingText.isEmpty()) "" else converter.readingOf(precedingText.takeLast(256))
-        return rankCandidates(decoder.decode(trace, context))
+        return rankScoredCandidates(decoder.decode(trace, context))
     }
 
     private data class RankedCandidate(val text: String, val score: Double, val readingIndex: Int, val variantIndex: Int)
 
     /** Rank already decoded readings without rerunning the gesture or language model. */
-    internal fun rankCandidates(readings: List<ReadingCandidate>): List<String> {
+    internal fun rankCandidates(readings: List<ReadingCandidate>): List<String> =
+        rankScoredCandidates(readings).map { it.text }
+
+    internal fun rankScoredCandidates(readings: List<ReadingCandidate>): List<DisplayCandidate> {
         checkCancellation()
         if (readings.isEmpty()) return emptyList()
         val conversions = readings.map { candidate ->
@@ -64,6 +72,10 @@ class GlideCandidateEngine(
             .thenBy { it.readingIndex }.thenBy { it.variantIndex }.thenBy { it.text })
         // Deduplicate AFTER ranking: a shared surface keeps its strongest reading's score.
         val ranked = ordered.distinctBy { it.text }
+        // Normalize before the display limit or diversity ordering so neither changes confidence.
+        // These heuristic scores provide relative support, not measured correctness probabilities.
+        val weights = ranked.associate { it.text to exp(it.score - ranked.first().score) }
+        val totalWeight = weights.values.sum()
         val selected = linkedSetOf(ranked.first().text)
         fun reserve(text: String?) {
             if (text != null && selected.size < maxCandidates) selected += text
@@ -81,7 +93,9 @@ class GlideCandidateEngine(
         previews.forEach { reserve(it.text) }
         ranked.forEach { reserve(it.text) }
         val leading = previews.filter { it.text in selected }
-        return (leading + ranked.filter { it.text in selected && it !in leading }).map { it.text }
+        return (leading + ranked.filter { it.text in selected && it !in leading }).map {
+            DisplayCandidate(it.text, weights.getValue(it.text) / totalWeight)
+        }
     }
 
     override fun close() {

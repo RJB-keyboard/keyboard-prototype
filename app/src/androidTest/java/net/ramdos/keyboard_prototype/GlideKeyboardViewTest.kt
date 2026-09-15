@@ -1,5 +1,9 @@
 package net.ramdos.keyboard_prototype
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import net.ramdos.keyboard_prototype.engine.DisplayCandidate
 import android.view.ContextThemeWrapper
 import android.view.MotionEvent
 import android.view.View
@@ -41,6 +45,43 @@ class GlideKeyboardViewTest {
         } finally {
             event.recycle()
         }
+    }
+
+    @Test
+    fun candidateColorsFollowConfidenceInBothLayoutsAndResetOnNewResults() = withKeyboard { keyboard, _ ->
+        val candidates = listOf(
+            DisplayCandidate("高", 1.0), DisplayCandidate("低", 0.0),
+            DisplayCandidate("中", 0.5), DisplayCandidate("不明"),
+        )
+        val expected = listOf(Color.rgb(200, 230, 201), Color.rgb(227, 242, 253),
+            Color.rgb(213, 236, 227), Color.WHITE)
+        fun backgroundColor(button: View): Int {
+            val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+            button.background.setBounds(0, 0, 100, 100)
+            button.background.draw(Canvas(bitmap))
+            return bitmap.getPixel(50, 50).also { bitmap.recycle() }
+        }
+        keyboard.showScoredCandidates(candidates)
+        val compact = keyboard.findViewById<ViewGroup>(R.id.candidate_row)
+        assertEquals(expected, (0 until compact.childCount).map { backgroundColor(compact.getChildAt(it)) })
+        val toggle = keyboard.findViewById<Button>(R.id.expand_candidates_key)
+        toggle.performClick()
+        val rows = keyboard.findViewById<ViewGroup>(R.id.expanded_candidates_rows)
+        val buttons = (0 until rows.childCount).flatMap { index ->
+            val row = rows.getChildAt(index) as ViewGroup
+            (0 until row.childCount).mapNotNull { row.getChildAt(it) as? Button }
+        }
+        assertEquals(expected, buttons.map { backgroundColor(it) })
+        var selection: String? = null
+        keyboard.onCandidateSelected = { selection = it }
+        buttons[2].performClick()
+        assertEquals("中", selection)
+        assertEquals(expected, (0 until compact.childCount).map { backgroundColor(compact.getChildAt(it)) })
+        keyboard.showScoredCandidates(listOf(DisplayCandidate("高", 0.0)))
+        assertEquals(expected[1], backgroundColor(compact.getChildAt(0)))
+        keyboard.reset()
+        assertEquals(0, compact.childCount)
+        assertEquals(0, rows.childCount)
     }
 
     @Test

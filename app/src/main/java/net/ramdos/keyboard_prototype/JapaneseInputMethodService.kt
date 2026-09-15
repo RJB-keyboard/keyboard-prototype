@@ -57,7 +57,7 @@ class JapaneseInputMethodService : InputMethodService() {
                                 reset()
                             } else {
                                 result.fold(
-                                    onSuccess = { showCandidates(it) },
+                                    onSuccess = { showScoredCandidates(it) },
                                     onFailure = { failure ->
                                         // Never log input text or trace coordinates.
                                         Log.e("GlideEngine", "Candidate generation failed: ${failure.javaClass.simpleName}")
