@@ -6,8 +6,10 @@ import android.os.Handler
 import android.os.Looper
 import android.text.InputType
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import net.ramdos.keyboard_prototype.engine.CandidateSession
 import net.ramdos.keyboard_prototype.engine.GlideCandidateEngine
 import net.ramdos.keyboard_prototype.engine.conversion.SumireKanaKanjiConverter
@@ -75,8 +77,22 @@ class JapaneseInputMethodService : InputMethodService() {
                     reset()
                 }
             }
+            onPunctuation = { candidates.invalidate() }
+            onSwitchKeyboard = { switchToOtherKeyboard() }
+            onChooseKeyboard = {
+                resetSession()
+                getSystemService(InputMethodManager::class.java).showInputMethodPicker()
+            }
             onSpace = { candidates.invalidate(); currentInputConnection?.commitText(" ", 1) }
             onBackspace = { candidates.invalidate(); currentInputConnection?.backspace() }
+            onCursorLeft = {
+                candidates.invalidate()
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT)
+            }
+            onCursorRight = {
+                candidates.invalidate()
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_RIGHT)
+            }
             onEnter = {
                 candidates.invalidate()
                 currentInputConnection?.enter(currentInputEditorInfo)
@@ -111,7 +127,11 @@ class JapaneseInputMethodService : InputMethodService() {
 
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        if (oldSelStart != newSelStart || oldSelEnd != newSelEnd) resetSession()
+        if (oldSelStart != newSelStart || oldSelEnd != newSelEnd) {
+            candidates.invalidate()
+            // Deleting moves the cursor too. Do not cancel a held backspace key.
+            keyboardView?.clearPendingInput()
+        }
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -134,6 +154,20 @@ class JapaneseInputMethodService : InputMethodService() {
     private fun resetSession() {
         candidates.invalidate()
         keyboardView?.reset()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun switchToOtherKeyboard() {
+        resetSession()
+        val manager = getSystemService(InputMethodManager::class.java)
+        val switched = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            switchToPreviousInputMethod() || switchToNextInputMethod(false)
+        } else {
+            val token = window?.window?.attributes?.token
+            token != null && (manager.switchToLastInputMethod(token) ||
+                manager.switchToNextInputMethod(token, false))
+        }
+        if (!switched) manager.showInputMethodPicker()
     }
 
     private class EngineInitializationException(cause: Throwable) : Exception("Input engine initialization failed", cause)
