@@ -23,6 +23,30 @@ import kotlin.math.hypot
 @RunWith(AndroidJUnit4::class)
 class GlideEngineInstrumentedTest {
     @Test
+    fun comparesAmbiguousPainAndShoppingReadings() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        OnnxHiraganaLanguageModel.open(context).use { model ->
+            SumireKanaKanjiConverter.open(context).use { converter ->
+                val decoder = GlideDecoder(languageModel = model, readingLexicon = converter.readingLexicon,
+                    config = GlideDecoderConfig(maxDecodeMillis = 15_000))
+                model.nextLogProbabilities("", listOf(""))
+                val engine = GlideCandidateEngine(model, converter, GlideDecoderConfig(maxDecodeMillis = 15_000))
+                for (baseKeys in listOf("いかいたい")) {
+                    for (trace in listOf(traceFor(baseKeys), continuousTraceFor(baseKeys, 0))) {
+                        val readings = decoder.decode(trace)
+                        Log.i("GlideEngineTest", "Ambiguous keys=$baseKeys points=${trace.points.size} readings=$readings")
+                        assertValidCandidates(readings)
+                        val candidates = engine.rankCandidates(readings)
+                        Log.i("GlideEngineTest", "Ambiguous candidates=$candidates")
+                        assertTrue(candidates.toString(), "胃が痛い" in candidates.take(3))
+                        assertTrue(candidates.toString(), "いかいたい" in candidates)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun comparesDictionaryOnTheSameNoisyContinuousGlidesUsingTheRealModel() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         OnnxHiraganaLanguageModel.open(context).use { model ->

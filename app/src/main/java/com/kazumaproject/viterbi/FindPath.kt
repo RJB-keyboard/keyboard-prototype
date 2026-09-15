@@ -8,10 +8,14 @@ import java.util.IdentityHashMap
 import java.util.TreeSet
 
 class FindPath {
+    /** Complete path cost, including BOS/EOS connections, in raw dictionary units. */
+    data class ScoredPath(val text: String, val cost: Long, val wordCost: Long, val connectionCost: Long)
+
     private data class State(
         val node: Node,
         val text: String,
         val cost: Long,
+        val wordCost: Long,
         val estimate: Long,
         val sequence: Long,
     )
@@ -27,7 +31,14 @@ class FindPath {
         length: Int,
         connectionMatrix: ConnectionMatrix,
         n: Int,
-    ): List<String> {
+    ): List<String> = backwardAStarCandidates(graph, length, connectionMatrix, n).map { it.text }
+
+    fun backwardAStarCandidates(
+        graph: List<MutableList<MutableList<Node>>>,
+        length: Int,
+        connectionMatrix: ConnectionMatrix,
+        n: Int,
+    ): List<ScoredPath> {
         if (n <= 0) return emptyList()
         val outgoing = List(length + 1) { mutableListOf<Node>() }
         for (end in 1..length) {
@@ -53,14 +64,15 @@ class FindPath {
 
         val queue = TreeSet(compareBy<State> { it.estimate }.thenBy { it.sequence })
         var sequence = 0L
-        queue += State(bos, "", 0L, remaining.getValue(bos), sequence++)
-        val result = linkedSetOf<String>()
+        queue += State(bos, "", 0L, 0L, remaining.getValue(bos), sequence++)
+        val result = linkedMapOf<String, ScoredPath>()
         var expanded = 0
         while (queue.isNotEmpty() && result.size < n && expanded < MAX_EXPANSIONS) {
             check(!Thread.currentThread().isInterrupted) { "Conversion interrupted" }
             val state = queue.pollFirst()!!
             if (state.node === eos) {
-                result += state.text
+                // A* visits complete paths by cost; keep the cheapest path for each surface.
+                result.putIfAbsent(state.text, ScoredPath(state.text, state.cost, state.wordCost, state.cost - state.wordCost))
                 continue
             }
             expanded++
@@ -71,12 +83,12 @@ class FindPath {
                 val cost = state.cost + next.wcost +
                     connectionMatrix.getCost(state.node.r.toInt(), next.l.toInt())
                 queue += State(next, if (next === eos) state.text else state.text + next.tango,
-                    cost, cost + suffix, sequence++)
+                    cost, state.wordCost + next.wcost, cost + suffix, sequence++)
                 // A bounded search is important for very ambiguous readings on an IME worker.
                 if (queue.size > MAX_QUEUED_PATHS) queue.pollLast()
             }
         }
-        return result.toList()
+        return result.values.toList()
     }
 
     companion object {

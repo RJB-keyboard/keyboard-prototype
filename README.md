@@ -31,6 +31,8 @@ GlideCandidateEngine
     ├─ SumireReadingLexicon → 読みのprefix・単語／接続コスト・未知語ペナルティ
     └─ GlideDecoder → ビーム探索で読み候補を生成
          ↓ Sumireの辞書・接続コスト・Viterbi/A*でかな漢字変換
+         ↓ 漢字かな交じりの文字n-gramで上位20候補を再評価
+         ↓ 読み間の表記文脈も比較し、近い読みの代表を最大3件先頭へ
     ↓ List<String>（変換候補＋最上位の読みそのもの）
 GlideKeyboardView.showCandidates
     ↓ 候補をタップ → onCandidateSelected
@@ -62,6 +64,8 @@ Kotlinファイルは `app/src/main/java/net/ramdos/keyboard_prototype/` 以下�
 `GlideDecoder.decode(trace, context)` は `ReadingCandidate` を返し、読み・Aの対数確率・Bの対数確率・辞書コスト・未知文字数・混合スコア・候補内の正規化確率を確認できます。IMEの初期スコアは `log A + 0.35 * log B - dictionaryCost`。`GlideDecoderConfig` でビーム幅、重み、文字追加ボーナス、上限を調整できます。`dictionaryWeight = 0.0` で以前のA+B探索との比較ができます。Aは幾何学的なヒューリスティックで、実ストロークから学習した校正済み確率ではありません。候補確率は刈り込まれたビーム内での近似値です。長い読みへの言語モデルのペナルティは、実データに合わせて重みと文字追加ボーナスを調整する必要があります。
 
 辞書は最終的な漢字変換だけでなく、読みの探索中の枝刈りにも使います。既知語と語の自然な接続を優先しつつ、名前・新語のための自由なかなの経路を残します。辞書で未知文字を含む読みは、無理に漢字断片へ変換せずかなのまま表示します。辞書は同じ配列を共有するため、追加ダウンロードは不要です。
+
+漢字候補は、同梱の約2MBの文字n-gramモデルでも評価します。読みが同じ「会う／合う」などの表記を、候補内の文字の並びから選び直します。モデルは公開例文から作成したもので、入力中の通信やユーザー入力の学習は行いません。方式と33例の比較結果・制約は [漢字表記の文脈評価](docs/conversion.md#漢字表記の文脈評価) を参照してください。
 
 Bはひらがなの次文字に条件付けた確率で、EOSはスコアに含めません。読みの長さは軌跡のイベントとスキップで決まります。漢字変換にはLLMを使いません。詳しくは [探索エンジン](docs/engine.md)、[モデル](docs/hiragana-model.md)、[変換エンジン](docs/conversion.md) を参照してください。
 
