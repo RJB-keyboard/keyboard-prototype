@@ -12,19 +12,23 @@ data class StrokeModelConfig(
     val maxInputPoints: Int = 8192,
     val maxResampledPoints: Int = 1024,
     val maxEvents: Int = 48,
-    val nearbyKeyCount: Int = 3,
-    val distanceSigma: Double = 0.43,
+    val nearbyKeyCount: Int = 9,
+    val distanceSigma: Double = 0.55,
     val straightEmissionProbability: Double = 0.10,
     val centerDwellMillis: Long = 140,
+    val maxNearbyKeyDistance: Double = 1.5,
+    val preciseDistanceSigma: Double = 0.43,
 ) {
     init {
         require(maxInputPoints in 2..65536)
         require(maxResampledPoints in 8..8192)
         require(maxEvents in 1..128)
-        require(nearbyKeyCount in 1..8)
+        require(nearbyKeyCount in 1..9)
         require(distanceSigma.isFinite() && distanceSigma in 0.05..2.0)
         require(straightEmissionProbability.isFinite() && straightEmissionProbability in 0.001..0.99)
         require(centerDwellMillis in 20..5000)
+        require(maxNearbyKeyDistance.isFinite() && maxNearbyKeyDistance in 1.25..16.0)
+        require(preciseDistanceSigma.isFinite() && preciseDistanceSigma in 0.05..2.0)
     }
 }
 
@@ -75,17 +79,27 @@ class StrokeModel(private val config: StrokeModelConfig = StrokeModelConfig()) {
             checkInterrupted()
             val key = keys[run.key]
             val anchor = (run.start..run.end).minByOrNull { squaredDistance(points[it], key) }!!
-            val nearest = keys.sortedBy { squaredDistance(points[anchor], it) }.take(config.nearbyKeyCount)
+            val dwellMillis = centerDwell(run, points, key)
+            // A tap or deliberate center hold is stronger location evidence than
+            // a moving finger. Broaden moving glides without blurring held keys.
+            val sigma = if (runs.size == 1 || dwellMillis >= config.centerDwellMillis)
+                min(config.distanceSigma, config.preciseDistanceSigma) else config.distanceSigma
+            // Keep all immediate neighbours eligible for dictionary/LM scoring.
+            // A count alone arbitrarily drops equally close directions, while
+            // a radius prevents filling the quota with distant keys at edges/gaps.
+            val nearest = keys.filter {
+                squaredDistance(points[anchor], it) <= config.maxNearbyKeyDistance * config.maxNearbyKeyDistance
+            }.sortedBy { squaredDistance(points[anchor], it) }.take(config.nearbyKeyCount)
             val charWeights = linkedMapOf<Char, Double>()
             nearest.forEach { candidate ->
-                val weight = exp(-squaredDistance(points[anchor], candidate) / (2 * config.distanceSigma * config.distanceSigma))
+                val weight = exp(-squaredDistance(points[anchor], candidate) / (2 * sigma * sigma))
                 variants(candidate.kana).forEach { (kana, prior) ->
                     charWeights[kana] = (charWeights[kana] ?: 0.0) + weight * prior
                 }
             }
             val emission = if (index == 0 || index == runs.lastIndex) 1.0 else {
                 val turn = turnAt(anchor, points) / Math.PI
-                val dwell = centerDwell(run, points, key) / config.centerDwellMillis
+                val dwell = dwellMillis / config.centerDwellMillis
                 max(if (run.repeated) 0.94 else 0.0,
                     config.straightEmissionProbability + 0.85 * turn + 0.80 * min(1.0, dwell)).coerceIn(0.001, 0.995)
             }
