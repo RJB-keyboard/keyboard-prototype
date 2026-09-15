@@ -31,4 +31,26 @@ class GojuonLayoutTest {
         assertNull(GojuonLayout.keyAt(1f, 0.1f))
         assertNull(GojuonLayout.keyAt(0.95f, 1f))
     }
+
+    @Test
+    fun sharedEdgesBelongToExactlyOneKey() {
+        // The boundary between か/あ and あ/い must not select two keys.
+        for ((x, y, expected) in listOf(
+            Triple(0.9f, 0.1f, "あ"),
+            Triple(0.95f, 0.2f, "い"),
+            Triple(0.9f, 0.2f, "い"),
+            Triple(0f, 0f, "わ"),
+        )) {
+            assertEquals(expected, GojuonLayout.keyAt(x, y)?.kana)
+            assertEquals(1, GojuonLayout.keys.count { it.contains(x, y) })
+        }
+    }
+
+    @Test
+    fun nonfiniteCoordinatesNeverSelectAKey() {
+        for (invalid in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            assertNull(GojuonLayout.keyAt(invalid, 0.1f))
+            assertNull(GojuonLayout.keyAt(0.95f, invalid))
+        }
+    }
 }

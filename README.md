@@ -90,11 +90,35 @@ powershell -ExecutionPolicy Bypass -File tools/prepare_hiragana_model.ps1
 
 ## 検証
 
+JDK 25とAndroid SDK（Platform 37.0、Build Tools 36.0.0）を使用します。Gradleは同梱のWrapperで実行します。
+
+Linux／macOSでCIと同じチェックを実行:
+
+```sh
+./gradlew --continue :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+```
+
+Windows:
+
 ```powershell
-.\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest
+.\gradlew.bat --continue :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
 # USBデバッグを許可した端末またはエミュレーターで実モデル・辞書・UIのテスト
 .\gradlew.bat :app:connectedDebugAndroidTest
 ```
+
+単体テストは同梱の辞書を使い、ONNXモデルのダウンロードや端末接続なしで実行できます。端末テストの実行には「ビルド準備」のモデル取得が必要です（Linux／macOSでは `pwsh -File tools/prepare_hiragana_model.ps1`）。モデルなしでもAPKのビルドはできますが、IMEの候補生成は利用できません。
+
+### GitHub Actions
+
+[Android CI](.github/workflows/android-ci.yml) は、`main`へのpush・Pull Request・手動実行に対応します。作業ブランチはPull Requestの作成・更新時にチェックし、pushとの二重実行を防ぎます。
+
+- 単体テスト、Android Lint、APKビルドの3ジョブを最大3並列で実行します。APKビルドではデバッグAPKと端末テストAPKをまとめてビルドします。
+- 1ジョブが失敗しても残りのチェックは継続します。全ジョブの成功を、従来と同じ名前の `Unit tests, lint and build` チェックで判定します。
+- Gradleの依存関係をキャッシュし、同じブランチ／PRの古い実行をキャンセルします。
+- 成功・失敗にかかわらず、生成されたレポートを `android-check-reports-unit-tests` と `android-check-reports-lint` に14日間保存します。
+- エミュレーターでの端末テスト実行はCIに含みません。上記の `connectedDebugAndroidTest` で実行します。
+
+ローカルのレポートは `app/build/reports/tests/testDebugUnitTest/index.html` と `app/build/reports/lint-results-debug.html`、JUnit XMLは `app/build/test-results/testDebugUnitTest/` に出力します。
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`
 
