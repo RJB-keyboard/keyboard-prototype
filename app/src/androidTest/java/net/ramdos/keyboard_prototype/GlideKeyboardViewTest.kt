@@ -4,7 +4,7 @@ import android.view.ContextThemeWrapper
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
-import android.widget.GridLayout
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -44,6 +44,63 @@ class GlideKeyboardViewTest {
     }
 
     @Test
+    fun expandedCandidatesUseBoardSpaceScrollAndCommitInOrder() = withKeyboard { keyboard, board ->
+        fun layout() {
+            keyboard.measure(View.MeasureSpec.makeMeasureSpec(1100, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            keyboard.layout(0, 0, keyboard.measuredWidth, keyboard.measuredHeight)
+        }
+        val toggle = keyboard.findViewById<Button>(R.id.expand_candidates_key)
+        assertEquals(View.GONE, toggle.visibility)
+        val candidates = (1..40).map { "候補$it" }
+        var selection: String? = null
+        keyboard.onCandidateSelected = { selection = it }
+        keyboard.showCandidates(candidates)
+        layout()
+        val originalHeight = keyboard.height
+        toggle.performClick()
+        layout()
+        layout() // Columns adapt to the newly visible viewport width.
+        assertEquals(originalHeight, keyboard.height)
+        assertEquals(View.INVISIBLE, board.visibility)
+        val scroll = keyboard.findViewById<android.widget.ScrollView>(R.id.expanded_candidates_scroll)
+        val rows = keyboard.findViewById<android.widget.LinearLayout>(R.id.expanded_candidates_rows)
+        val buttons = (0 until rows.childCount).flatMap { index ->
+            val row = rows.getChildAt(index) as android.widget.LinearLayout
+            (0 until row.childCount).mapNotNull { row.getChildAt(it) as? Button }
+        }
+        assertEquals(candidates, buttons.map { it.text.toString() })
+        assertTrue(rows.height > scroll.height)
+        scroll.scrollTo(0, rows.height)
+        assertTrue(scroll.scrollY > 0)
+        buttons.last().performClick()
+        assertEquals("候補40", selection)
+        assertEquals(View.VISIBLE, board.visibility)
+        assertEquals(View.GONE, scroll.visibility)
+    }
+
+    @Test
+    fun foldingPreservesCandidatesAndResetClearsExpandedState() = withKeyboard { keyboard, board ->
+        val toggle = keyboard.findViewById<Button>(R.id.expand_candidates_key)
+        val row = keyboard.findViewById<ViewGroup>(R.id.candidate_row)
+        keyboard.showCandidates(listOf("一", "二", "三"))
+        toggle.performClick()
+        toggle.performClick()
+        assertEquals(View.VISIBLE, board.visibility)
+        assertEquals(3, row.childCount)
+        toggle.performClick()
+        keyboard.findViewById<Button>(R.id.backspace_key).performClick()
+        assertEquals(View.VISIBLE, board.visibility)
+        assertEquals(View.GONE, toggle.visibility)
+        assertEquals(0, row.childCount)
+        keyboard.showCandidates(listOf("新しい候補"))
+        toggle.performClick()
+        keyboard.showStatus(R.string.engine_working)
+        assertEquals(View.VISIBLE, board.visibility)
+        assertEquals(View.GONE, toggle.visibility)
+    }
+
+    @Test
     fun punctuationTapAndFlickCommitOnReleaseAndCanBeCancelled() = withKeyboard { keyboard, _ ->
         val key = keyboard.findViewById<Button>(R.id.punctuation_key)
         val selections = mutableListOf<String>()
@@ -53,19 +110,23 @@ class GlideKeyboardViewTest {
             val event = MotionEvent.obtain(100, 120, action, key.width / 2f + dx, key.height / 2f + dy, 0)
             try { assertTrue(key.dispatchTouchEvent(event)) } finally { event.recycle() }
         }
-        for ((dx, dy) in listOf(0f to 0f, distance to 0f, -distance to 0f, 0f to distance, 0f to -distance)) {
+        val expected = listOf("、", "？", "。", "...", "！", "。", "！")
+        val offsets = listOf(0f to 0f, distance to 0f, -distance to 0f, 0f to distance,
+            0f to -distance, -distance to distance / 2, distance / 2 to -distance)
+        for ((index, offset) in offsets.withIndex()) {
+            val (dx, dy) = offset
             val before = selections.size
             keyboard.showCandidates(listOf("未確定"))
             send(MotionEvent.ACTION_DOWN)
             send(MotionEvent.ACTION_MOVE, dx, dy)
             assertEquals(before, selections.size)
-            assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
-            assertEquals(if (dx == 0f && dy == 0f) "、" else "。", key.text.toString())
+            assertEquals(0, keyboard.findViewById<ViewGroup>(R.id.candidate_row).childCount)
+            assertEquals(expected[index], key.text.toString())
             send(MotionEvent.ACTION_UP, dx, dy)
             assertEquals(before + 1, selections.size)
             assertFalse(key.isPressed)
         }
-        assertEquals(listOf("、", "。", "。", "。", "。"), selections)
+        assertEquals(expected, selections)
         for (cancel in listOf<() -> Unit>(
             { send(MotionEvent.ACTION_CANCEL) },
             { send(MotionEvent.ACTION_POINTER_DOWN) },
@@ -76,13 +137,13 @@ class GlideKeyboardViewTest {
             cancel()
             send(MotionEvent.ACTION_UP, distance)
         }
-        assertEquals(5, selections.size)
+        assertEquals(expected.size, selections.size)
         send(MotionEvent.ACTION_DOWN)
         send(MotionEvent.ACTION_MOVE, distance)
         send(MotionEvent.ACTION_UP, 1f, 1f)
         assertEquals("、", selections.last())
         key.performClick()
-        assertEquals(7, selections.size)
+        assertEquals(expected.size + 2, selections.size)
         assertEquals("、", selections.last())
     }
 
@@ -96,7 +157,7 @@ class GlideKeyboardViewTest {
         }
         keyboard.onTraceCompleted = { keyboard.showCandidates(engine.generateCandidates(it)) }
         keyboard.onCandidateSelected = { selections.add(it); keyboard.reset() }
-        val row = keyboard.findViewById<GridLayout>(R.id.candidate_row)
+        val row = keyboard.findViewById<ViewGroup>(R.id.candidate_row)
 
         touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
         assertTrue(requests.isEmpty())
@@ -136,7 +197,7 @@ class GlideKeyboardViewTest {
             touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
             keyboard.showCandidates(listOf("未確定"))
             if (longPress) assertTrue(key.performLongClick()) else key.performClick()
-            assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+            assertEquals(0, keyboard.findViewById<ViewGroup>(R.id.candidate_row).childCount)
             touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
         }
         assertEquals(1, switches)
@@ -144,6 +205,36 @@ class GlideKeyboardViewTest {
         assertEquals(0, commits)
         assertEquals(0, traces)
         assertTrue(key.bottom <= keyboard.findViewById<View>(R.id.backspace_key).top)
+    }
+
+    @Test
+    fun candidatesPackEachRowWithoutStretchingOrWrappingText() = withKeyboard { keyboard, _ ->
+        val candidates = listOf("ありがとうございます", "有難う", "ありがとう", "蟻", "有り", "あり", "アリ", "在り")
+        keyboard.showCandidates(candidates)
+        keyboard.measure(View.MeasureSpec.makeMeasureSpec(1100, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+        keyboard.layout(0, 0, keyboard.measuredWidth, keyboard.measuredHeight)
+        val row = keyboard.findViewById<ViewGroup>(R.id.candidate_row)
+        assertTrue(row.getChildAt(1).width < row.getChildAt(0).width)
+        for (index in 2 until row.childCount) {
+            assertEquals(row.getChildAt(index - 2).right, row.getChildAt(index).left)
+        }
+        var selected = ""
+        keyboard.onCandidateSelected = { selected = it }
+        for (index in candidates.indices) {
+            val key = row.getChildAt(index) as Button
+            assertEquals(1, key.lineCount)
+            assertTrue(key.width >= (48 * keyboard.resources.displayMetrics.density).toInt())
+            key.performClick()
+            assertEquals(candidates[index], selected)
+        }
+        keyboard.viewTreeObserver.dispatchOnPreDraw()
+        val bitmap = android.graphics.Bitmap.createBitmap(keyboard.width, keyboard.height, android.graphics.Bitmap.Config.ARGB_8888)
+        keyboard.draw(android.graphics.Canvas(bitmap))
+        java.io.File(instrumentation.targetContext.cacheDir, "candidate-layout.png").outputStream().use {
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+        bitmap.recycle()
     }
 
     @Test
@@ -156,7 +247,7 @@ class GlideKeyboardViewTest {
         keyboard.showCandidates(listOf("あ", "い"))
         key.performClick()
         assertEquals(1, deletions)
-        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        assertEquals(0, keyboard.findViewById<ViewGroup>(R.id.candidate_row).childCount)
         assertEquals(View.VISIBLE, keyboard.findViewById<TextView>(R.id.candidate_hint).visibility)
 
         touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
@@ -176,7 +267,7 @@ class GlideKeyboardViewTest {
         keyboard.showCandidates(listOf("あ", "い"))
         key.performClick()
         assertEquals(1, spaces)
-        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        assertEquals(0, keyboard.findViewById<ViewGroup>(R.id.candidate_row).childCount)
         assertEquals(View.VISIBLE, keyboard.findViewById<TextView>(R.id.candidate_hint).visibility)
 
         touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
@@ -215,7 +306,7 @@ class GlideKeyboardViewTest {
         keyboard.showCandidates(listOf("あ", "い"))
         key.performClick()
         assertEquals(1, enters)
-        assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+        assertEquals(0, keyboard.findViewById<ViewGroup>(R.id.candidate_row).childCount)
         touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
         key.performClick()
         touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
@@ -233,7 +324,7 @@ class GlideKeyboardViewTest {
         for (id in listOf(R.id.cursor_left_key, R.id.cursor_right_key)) {
             keyboard.showCandidates(listOf("候補"))
             keyboard.findViewById<Button>(id).performClick()
-            assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+            assertEquals(0, keyboard.findViewById<ViewGroup>(R.id.candidate_row).childCount)
             touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
             keyboard.findViewById<Button>(id).performClick()
             touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
@@ -260,7 +351,7 @@ class GlideKeyboardViewTest {
         assertTrue(delete.bottom <= board.top)
         assertEquals(candidates.bottom, delete.bottom)
         assertTrue(candidates.right <= delete.left)
-        val row = keyboard.findViewById<GridLayout>(R.id.candidate_row)
+        val row = keyboard.findViewById<ViewGroup>(R.id.candidate_row)
         assertEquals(row.getChildAt(0).top, row.getChildAt(2).top)
         assertEquals(row.getChildAt(1).top, row.getChildAt(3).top)
         assertTrue(row.getChildAt(0).bottom <= row.getChildAt(1).top)
@@ -365,7 +456,7 @@ class GlideKeyboardViewTest {
     fun cancellationOutsideReleaseAndResetDoNotProduceCandidates() = withKeyboard { keyboard, board ->
         var completed = 0
         keyboard.onTraceCompleted = { completed++; keyboard.showCandidates(listOf("あ", "い")) }
-        val row = keyboard.findViewById<GridLayout>(R.id.candidate_row)
+        val row = keyboard.findViewById<ViewGroup>(R.id.candidate_row)
         touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
         touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
         assertEquals(2, row.childCount)

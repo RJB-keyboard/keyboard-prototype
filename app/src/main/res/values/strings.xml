@@ -27,11 +27,19 @@
     <string name="enter_done">完了</string>
     <string name="punctuation_key">、。</string>
     <string name="punctuation_full_stop">「。」を入力</string>
-    <string name="punctuation_description">タップで「、」、フリックで「。」を入力</string>
+    <string name="punctuation_exclamation">「！」を入力</string>
+    <string name="punctuation_question">「？」を入力</string>
+    <string name="punctuation_dots">半角ピリオド3つを入力</string>
+    <string name="punctuation_description">タップで「、」、左で「。」、上で「！」、右で「？」、下で半角ピリオド3つを入力</string>
     <string name="space_key">スペース</string>
     <string name="space_description">半角スペースを入力</string>
     <string name="cursor_left_key">‹</string>
     <string name="cursor_right_key">›</string>
     <string name="cursor_left_description">カーソルを左へ移動</string>
     <string name="cursor_right_description">カーソルを右へ移動</string>
+    <string name="expand_candidates_key">⌄</string>
+    <string name="collapse_candidates_key">⌃</string>
+    <string name="expand_candidates">候補一覧を広げる</string>
+    <string name="collapse_candidates">五十音キーに戻る</string>
+    <string name="expanded_candidates_title">候補一覧</string>
 </resources>

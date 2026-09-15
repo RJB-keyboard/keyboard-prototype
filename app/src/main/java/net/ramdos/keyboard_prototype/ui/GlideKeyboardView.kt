@@ -11,10 +11,10 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewConfiguration
 import android.widget.Button
-import android.widget.GridLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import net.ramdos.keyboard_prototype.R
@@ -36,9 +36,14 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     var onChooseKeyboard: (() -> Unit)? = null
 
     private val board: GojuonBoardView
-    private val candidateRow: GridLayout
+    private val candidateRow: CandidateRowsView
     private val candidateScroll: HorizontalScrollView
     private val hint: TextView
+    private val expandedScroll: ScrollView
+    private val expandedRows: LinearLayout
+    private val expandKey: Button
+    private var displayedCandidates: List<String> = emptyList()
+    private var candidatesExpanded = false
 
     private var punctuationHeld = false
     private lateinit var punctuationKey: Button
@@ -79,6 +84,13 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         candidateRow = findViewById(R.id.candidate_row)
         candidateScroll = findViewById(R.id.candidate_scroll)
         hint = findViewById(R.id.candidate_hint)
+        expandedScroll = findViewById(R.id.expanded_candidates_scroll)
+        expandedRows = findViewById(R.id.expanded_candidates_rows)
+        expandKey = findViewById(R.id.expand_candidates_key)
+        expandKey.setOnClickListener { setCandidatesExpanded(!candidatesExpanded) }
+        expandedScroll.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (candidatesExpanded && right - left != oldRight - oldLeft) renderExpandedCandidates()
+        }
         bindBackspaceKey()
         findViewById<Button>(R.id.switch_keyboard_key).apply {
             setOnClickListener {
@@ -125,7 +137,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         board.onTraceCompleted = { onTraceCompleted?.invoke(it) }
     }
 
-    // A tap enters a comma; a flick in any direction enters a full stop.
+    // Use the dominant axis for diagonal flicks; release determines the symbol.
     @SuppressLint("ClickableViewAccessibility")
     private fun bindPunctuationKey() {
         punctuationKey = findViewById(R.id.punctuation_key)
@@ -138,7 +150,12 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         fun symbol(event: MotionEvent): String {
             val dx = event.x - startX
             val dy = event.y - startY
-            return if (dx * dx + dy * dy >= threshold * threshold) "。" else "、"
+            if (dx * dx + dy * dy < threshold * threshold) return "、"
+            return if (kotlin.math.abs(dx) >= kotlin.math.abs(dy)) {
+                if (dx < 0) "。" else "？"
+            } else {
+                if (dy < 0) "！" else "..."
+            }
         }
         fun commit(symbol: String) {
             reset()
@@ -146,9 +163,16 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             onCandidateSelected?.invoke(symbol)
         }
         punctuationKey.setOnClickListener { commit("、") }
-        ViewCompat.addAccessibilityAction(
-            punctuationKey, context.getString(R.string.punctuation_full_stop),
-        ) { _, _ -> commit("。"); true }
+        for ((label, value) in listOf(
+            R.string.punctuation_full_stop to "。",
+            R.string.punctuation_exclamation to "！",
+            R.string.punctuation_question to "？",
+            R.string.punctuation_dots to "...",
+        )) {
+            ViewCompat.addAccessibilityAction(
+                punctuationKey, context.getString(label),
+            ) { _, _ -> commit(value); true }
+        }
         punctuationKey.setOnTouchListener { view, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -214,31 +238,93 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     }
 
     fun showCandidates(candidates: List<String>) {
+        setCandidatesExpanded(false)
+        displayedCandidates = candidates.toList()
+        expandedRows.removeAllViews()
+        expandKey.visibility = if (candidates.isEmpty()) View.GONE else View.VISIBLE
         candidateRow.removeAllViews()
         hint.visibility = if (candidates.isEmpty()) View.VISIBLE else View.GONE
         hint.setText(R.string.candidate_hint)
         candidateScroll.visibility = if (candidates.isEmpty()) View.GONE else View.VISIBLE
-        candidates.forEachIndexed { index, candidate ->
+        candidates.forEach { candidate ->
             candidateRow.addView(Button(context).apply {
                 text = candidate
                 textSize = 22f
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                setPadding(paddingLeft, 0, paddingRight, 0)
+                val density = resources.displayMetrics.density
+                minWidth = (48 * density).toInt()
+                minimumWidth = minWidth
+                minHeight = (48 * density).toInt()
+                minimumHeight = minHeight
+                setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
+                setSingleLine(true)
                 isAllCaps = false
                 setTextColor(Color.rgb(23, 33, 46))
-                backgroundTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                backgroundTintList = null
+                setBackgroundResource(R.drawable.candidate_background)
                 contentDescription = context.getString(R.string.commit_candidate, candidate)
                 setOnClickListener { onCandidateSelected?.invoke(candidate) }
-            }, GridLayout.LayoutParams(
-                GridLayout.spec(index % 2),
-                GridLayout.spec(index / 2, GridLayout.FILL),
-            ).apply {
-                width = LayoutParams.WRAP_CONTENT
-                height = (48 * resources.displayMetrics.density).toInt()
             })
         }
         candidateScroll.scrollTo(0, 0)
+    }
+
+    private fun setCandidatesExpanded(expanded: Boolean) {
+        candidatesExpanded = expanded && displayedCandidates.isNotEmpty()
+        board.visibility = if (candidatesExpanded) View.INVISIBLE else View.VISIBLE
+        findViewById<View>(R.id.compact_candidates).visibility =
+            if (candidatesExpanded) View.INVISIBLE else View.VISIBLE
+        expandedScroll.visibility = if (candidatesExpanded) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.expanded_candidates_title).visibility = expandedScroll.visibility
+        expandKey.setText(if (candidatesExpanded) R.string.collapse_candidates_key else R.string.expand_candidates_key)
+        expandKey.contentDescription = context.getString(
+            if (candidatesExpanded) R.string.collapse_candidates else R.string.expand_candidates,
+        )
+        if (candidatesExpanded) {
+            expandedScroll.layoutParams = expandedScroll.layoutParams.apply {
+                height = resources.getDimensionPixelSize(R.dimen.gojuon_board_height) +
+                    (48 * resources.displayMetrics.density).toInt()
+            }
+            board.clearTrace()
+            renderExpandedCandidates()
+            expandedScroll.scrollTo(0, 0)
+        }
+    }
+
+    private fun renderExpandedCandidates() {
+        val density = resources.displayMetrics.density
+        val columns = (expandedScroll.width / (112 * density)).toInt().coerceIn(1, 4)
+        expandedRows.removeAllViews()
+        displayedCandidates.chunked(columns).forEach { candidates ->
+            val row = LinearLayout(context).apply { orientation = HORIZONTAL }
+            candidates.forEach { candidate ->
+                row.addView(Button(context).apply {
+                    text = candidate
+                    textSize = 20f
+                    isAllCaps = false
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    minWidth = 0
+                    minimumWidth = 0
+                    minHeight = (48 * density).toInt()
+                    setPadding((4 * density).toInt(), (6 * density).toInt(),
+                        (4 * density).toInt(), (6 * density).toInt())
+                    setTextColor(Color.rgb(23, 33, 46))
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                    contentDescription = context.getString(R.string.commit_candidate, candidate)
+                    setOnClickListener {
+                        setCandidatesExpanded(false)
+                        onCandidateSelected?.invoke(candidate)
+                    }
+                }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+            }
+            // Keep the final row's cells aligned with the preceding rows.
+            repeat(columns - candidates.size) {
+                row.addView(View(context), LayoutParams(0, 0, 1f))
+            }
+            expandedRows.addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        }
     }
 
     fun setEnterLabel(label: CharSequence) {
