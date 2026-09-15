@@ -380,6 +380,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             val newline = label.toString() == context.getString(R.string.enter_newline)
             text = if (newline) context.getString(R.string.enter_newline_symbol) else label
             textSize = if (newline) 36f else 16f
+            textScaleX = if (newline) 1.6f else 1f
             contentDescription = label
         }
     }

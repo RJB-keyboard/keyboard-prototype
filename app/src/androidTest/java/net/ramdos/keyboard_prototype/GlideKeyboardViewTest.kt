@@ -38,6 +38,47 @@ class GlideKeyboardViewTest {
         }
     }
 
+    @Test
+    fun actionSymbolsAreVisibleAndClickable() {
+        val scenario = androidx.test.core.app.ActivityScenario.launch(MainActivity::class.java)
+        try {
+            lateinit var keyboard: GlideKeyboardView
+            var deleted = 0
+            var spaced = 0
+            var entered = 0
+            scenario.onActivity { activity ->
+                keyboard = GlideKeyboardView(ContextThemeWrapper(instrumentation.targetContext, android.R.style.Theme_InputMethod))
+                keyboard.onBackspace = { deleted++ }
+                keyboard.onSpace = { spaced++ }
+                keyboard.onEnter = { entered++ }
+                activity.setContentView(keyboard)
+            }
+            instrumentation.waitForIdleSync()
+            android.os.SystemClock.sleep(250) // Wait for the attached view to reach the display.
+            val screenshot = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+            scenario.onActivity {
+                for (id in listOf(R.id.backspace_key, R.id.space_key, R.id.enter_key)) {
+                    val key = keyboard.findViewById<Button>(id)
+                    assertTrue(key.isShown)
+                    assertTrue(key.width > 0 && key.height > 0)
+                    val location = IntArray(2)
+                    key.getLocationOnScreen(location)
+                    var inkPixels = 0
+                    for (y in 0 until key.height) for (x in 0 until key.width) {
+                        val color = screenshot.getPixel(location[0] + x, location[1] + y)
+                        if (Color.alpha(color) > 200 && Color.red(color) < 90 && Color.green(color) < 90 && Color.blue(color) < 90) inkPixels++
+                    }
+                    assertTrue("${key.contentDescription} must visibly draw its symbol; ink=$inkPixels", inkPixels > 20)
+                    key.performClick()
+                }
+                assertEquals(1, deleted)
+                assertEquals(1, spaced)
+                assertEquals(1, entered)
+            }
+            screenshot.recycle()
+        } finally { scenario.close() }
+    }
+
     private fun touch(board: GojuonBoardView, action: Int, x: Float, y: Float, time: Long) {
         val event = MotionEvent.obtain(100, time, action, x * board.width, y * board.height, 0)
         try {
