@@ -67,7 +67,8 @@ class GlideEngineInstrumentedTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         OnnxHiraganaLanguageModel.open(context).use { model ->
             SumireKanaKanjiConverter.open(context).use { converter ->
-                val config = GlideDecoderConfig(maxDecodeMillis = 15_000)
+                // Keep the historical dictionary comparison independent of length correction.
+                val config = GlideDecoderConfig(maxDecodeMillis = 15_000, characterInsertionBonus = 0.0)
                 val lexicon = requireNotNull(converter.readingLexicon)
                 val withoutDictionary = GlideDecoder(
                     languageModel = model,
@@ -122,6 +123,40 @@ class GlideEngineInstrumentedTest {
                         }
                         // とうきょう currently misses the returned beam in both
                         // modes. Keep it in diagnostics without claiming a fix.
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun lengthCorrectionKeepsTracedReadingsAheadOfShortFragments() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        OnnxHiraganaLanguageModel.open(context).use { model ->
+            SumireKanaKanjiConverter.open(context).use { converter ->
+                val config = GlideDecoderConfig(maxDecodeMillis = 15_000)
+                val previous = GlideDecoder(languageModel = model, readingLexicon = converter.readingLexicon,
+                    config = config.copy(characterInsertionBonus = 0.0))
+                val corrected = GlideDecoder(languageModel = model, readingLexicon = converter.readingLexicon,
+                    config = config)
+                val engine = GlideCandidateEngine(model, converter, config)
+                model.nextLogProbabilities("", listOf(""))
+                val fixtures = listOf(
+                    NoisyFixture("こんにちは", "こんにちは", ""),
+                    NoisyFixture("ありがとう", "ありかとう", ""),
+                    NoisyFixture("にほんご", "にほんこ", "わたしは"),
+                )
+                fixtures.forEachIndexed { index, fixture ->
+                    val trace = continuousTraceFor(fixture.baseKeys, index)
+                    val baseline = previous.decode(trace, fixture.context)
+                    val readings = corrected.decode(trace, fixture.context)
+                    val candidates = engine.rankCandidates(readings)
+                    Log.i("GlideEngineTest", "Length correction ${fixture.reading}: before=$baseline after=$readings candidates=$candidates")
+                    assertValidCandidates(readings)
+                    assertEquals(fixture.reading, readings.first().reading)
+                    if (fixture.reading == "にほんご") {
+                        assertEquals("にこ", baseline.first().reading)
+                        assertTrue(candidates.toString(), "日本語" in candidates.take(3))
                     }
                 }
             }
