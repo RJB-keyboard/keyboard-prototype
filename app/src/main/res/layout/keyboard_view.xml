@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merge xmlns:android="http://schemas.android.com/apk/res/android">
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <TextView
         android:layout_width="match_parent"
@@ -11,45 +12,36 @@
         android:textColor="#42516A"
         android:textSize="12sp" />
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="96dp"
-        android:orientation="horizontal"
         android:paddingStart="8dp"
         android:paddingEnd="8dp">
 
-        <FrameLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/candidate_hint"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="1">
+            android:gravity="center_vertical"
+            android:text="@string/candidate_hint"
+            android:textColor="#42516A"
+            android:textSize="14sp" />
 
-            <TextView
-                android:id="@+id/candidate_hint"
-                android:layout_width="match_parent"
+        <HorizontalScrollView
+            android:id="@+id/candidate_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <GridLayout
+                android:id="@+id/candidate_row"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:text="@string/candidate_hint"
-                android:textColor="#42516A"
-                android:textSize="14sp" />
-
-            <HorizontalScrollView
-                android:id="@+id/candidate_scroll"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scrollbars="none"
-                android:visibility="gone">
-
-                <GridLayout
-                    android:id="@+id/candidate_row"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:rowCount="2" />
-            </HorizontalScrollView>
-        </FrameLayout>
-
-
-    </LinearLayout>
+                android:orientation="vertical"
+                android:rowCount="2" />
+        </HorizontalScrollView>
+    </FrameLayout>
 
     <net.ramdos.keyboard_prototype.ui.GojuonBoardView
         android:id="@+id/gojuon_board"
@@ -59,6 +51,7 @@
         android:layout_marginEnd="4dp"
         android:layout_marginBottom="4dp" />
 
+    <!-- These are keyboard keys, not dialog actions: keep their bounded backgrounds. -->
     <LinearLayout
         android:id="@+id/action_row"
         android:layout_width="match_parent"
@@ -67,7 +60,8 @@
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="4dp"
         android:layoutDirection="ltr"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        tools:ignore="ButtonStyle">
         <Button
             android:id="@+id/backspace_key"
             android:layout_width="0dp"
