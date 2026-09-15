@@ -32,7 +32,7 @@
     <string name="punctuation_dots">半角ピリオド3つを入力</string>
     <string name="punctuation_description">タップで「、」、左で「。」、上で「！」、右で「？」、下で半角ピリオド3つを入力</string>
     <string name="space_key">スペース</string>
-    <string name="space_description">半角スペースを入力</string>
+    <string name="space_description">全角スペースを入力</string>
     <string name="cursor_left_key">‹</string>
     <string name="cursor_right_key">›</string>
     <string name="cursor_left_description">カーソルを左へ移動</string>

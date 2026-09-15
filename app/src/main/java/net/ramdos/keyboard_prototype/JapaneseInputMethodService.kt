@@ -83,7 +83,7 @@ class JapaneseInputMethodService : InputMethodService() {
                 resetSession()
                 getSystemService(InputMethodManager::class.java).showInputMethodPicker()
             }
-            onSpace = { candidates.invalidate(); currentInputConnection?.commitText(" ", 1) }
+            onSpace = { candidates.invalidate(); currentInputConnection?.commitText("\u3000", 1) }
             onBackspace = { candidates.invalidate(); currentInputConnection?.backspace() }
             onCursorLeft = {
                 candidates.invalidate()
