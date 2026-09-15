@@ -93,18 +93,27 @@ class GlideDecoder(
         // Local to one call: no stale context, unbounded lifetime cache, or cross-thread state.
         val languageCache = HashMap<String, Map<Char, Double>>()
         val lexicon = if (config.dictionaryWeight > 0.0) readingLexicon?.newSession() else null
-        fun cacheLanguage(hypotheses: List<Hypothesis>) {
+        fun cacheLanguage(hypotheses: List<Hypothesis>, repeatedPredictions: Int = 1) {
             if (config.languageWeight > 0.0) {
                 val missing = hypotheses.asSequence().map { it.reading }.filter { it.length < config.maxReadingLength && it !in languageCache }.distinct().toList()
                 if (missing.isNotEmpty()) {
-                    val probabilities = languageModel.nextLogProbabilities(context, missing)
+                    val probabilities = if (repeatedPredictions > 1)
+                        languageModel.nextRepeatedLogProbabilities(context, missing, repeatedPredictions)
+                    else languageModel.nextLogProbabilities(context, missing).map { listOf(it) }
                     checkBudget()
                     require(probabilities.size == missing.size) { "Language model returned the wrong batch size" }
-                    missing.zip(probabilities).forEach { (prefix, distribution) ->
-                        require(distribution.all { (kana, value) -> kana.isKanaReadingCharacter() && !value.isNaN() && value <= 0.000001 }) {
-                            "Language model must return hiragana natural log probabilities"
+                    missing.zip(probabilities).forEach { (prefix, predictions) ->
+                        require(predictions.size in 1..repeatedPredictions) { "Language model returned the wrong lookahead size" }
+                        predictions.forEachIndexed { index, distribution ->
+                            require(distribution.all { (kana, value) -> kana.isKanaReadingCharacter() && !value.isNaN() && value <= 0.000001 }) {
+                                "Language model must return hiragana natural log probabilities"
+                            }
+                            val predictedPrefix = if (index == 0) prefix else prefix + prefix.last().toString().repeat(index)
+                            if (predictedPrefix.length < config.maxReadingLength) {
+                                // Keep probabilities already used to score surviving paths.
+                                languageCache.putIfAbsent(predictedPrefix, distribution.mapValues { minOf(0.0, it.value) })
+                            }
                         }
-                        languageCache[prefix] = distribution.mapValues { minOf(0.0, it.value) }
                     }
                 }
             }
@@ -166,7 +175,7 @@ class GlideDecoder(
                 // Completion costs apply only when stopping, including at the last
                 // event: an unfinished repeated word must remain eligible to grow.
                 val frontier = selectBeam(evaluate(extendable, complete = false), config.maxBeamWidth, reserved)
-                cacheLanguage(frontier)
+                cacheLanguage(frontier, repeatedPredictions = repeatLimit - count)
                 repeating = frontier.mapNotNull {
                     val kana = it.reading.last()
                     val probability = languageProbability(it.reading, kana)

@@ -35,15 +35,23 @@ class OnnxHiraganaLanguageModel private constructor(
     }
 
     @Synchronized
-    override fun nextLogProbabilities(context: String, prefixes: List<String>): List<Map<Char, Double>> {
+    override fun nextLogProbabilities(context: String, prefixes: List<String>): List<Map<Char, Double>> =
+        nextRepeatedLogProbabilities(context, prefixes, 1).map { it.single() }
+
+    @Synchronized
+    override fun nextRepeatedLogProbabilities(
+        context: String, prefixes: List<String>, maxPredictions: Int,
+    ): List<List<Map<Char, Double>>> {
+        require(maxPredictions in 1..8)
         check(!closed) { "Language model is closed" }
         val generation = cancellationGeneration.get()
         checkCancellation(generation)
         if (prefixes.isEmpty()) return emptyList()
-        val distributions = ArrayList<Map<Char, Double>>(prefixes.size)
+        val distributions = ArrayList<List<Map<Char, Double>>>(prefixes.size)
         for (batch in prefixes.chunked(maxBatchSize)) {
             checkCancellation(generation)
-            val encoded = batch.map { tokenizer.encode(context, it, maxContextTokens) }
+            val inputs = batch.map { tokenizer.repeatedKanaInput(context, it, maxContextTokens, maxPredictions) }
+            val encoded = inputs.map { it.tokens }
             val length = encoded.maxOf { it.size }
             val ids = Array(encoded.size) { row -> LongArray(length) { column ->
                 encoded[row].getOrElse(column) { HiraganaTokenizer.PAD_TOKEN_ID.toLong() }
@@ -76,12 +84,15 @@ class OnnxHiraganaLanguageModel private constructor(
                                 check(shape.contentEquals(longArrayOf(encoded.size.toLong(), length.toLong(), tokenizer.vocabularySize.toLong()))) {
                                     "Unexpected logits shape: ${shape.contentToString()}"
                                 }
-                                // Only copy the last real position, not the entire 3-D logits tensor.
+                                // The causal mask makes earlier positions independent of the
+                                // appended repeats. Copy only the requested positions.
                                 val values = tensor.floatBuffer
-                                encoded.forEachIndexed { row, tokens ->
-                                    val start = (row * length + tokens.lastIndex) * tokenizer.vocabularySize
-                                    val logits = FloatArray(tokenizer.vocabularySize) { values.get(start + it) }
-                                    distributions += tokenizer.logProbabilities(logits)
+                                inputs.forEachIndexed { row, input ->
+                                    distributions += input.predictionPositions.map { position ->
+                                        val start = (row * length + position) * tokenizer.vocabularySize
+                                        val logits = FloatArray(tokenizer.vocabularySize) { values.get(start + it) }
+                                        tokenizer.logProbabilities(logits)
+                                    }
                                 }
                             }
                         } catch (error: OrtException) {

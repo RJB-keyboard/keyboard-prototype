@@ -10,6 +10,15 @@ package net.ramdos.keyboard_prototype.engine
  */
 interface KanaLanguageModel : AutoCloseable {
     fun nextLogProbabilities(context: String, prefixes: List<String>): List<Map<Char, Double>>
+    /**
+     * Optional causal lookahead for a nonempty prefix followed by repeats of its last kana.
+     * Row i, element j equals nextLogProbabilities(context, prefix + lastKana.repeat(j)).
+     * Each row may return only 1..maxPredictions elements (e.g. at a context-window boundary).
+     * This does not select candidates; callers retain normal beam pruning and scoring.
+     */
+    fun nextRepeatedLogProbabilities(
+        context: String, prefixes: List<String>, maxPredictions: Int,
+    ): List<List<Map<Char, Double>>> = nextLogProbabilities(context, prefixes).map { listOf(it) }
     /** May be called concurrently to stop native work after a gesture is superseded. */
     fun cancelPendingInference() {}
     override fun close() {}
