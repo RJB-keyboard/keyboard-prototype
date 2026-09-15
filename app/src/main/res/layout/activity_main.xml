@@ -9,7 +9,7 @@
     tools:ignore="MergeRootFrame,UselessParent">
 
     <ScrollView
-        android:id="@+id/setup_scroll"
+        android:id="@id/setup_scroll"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true">
