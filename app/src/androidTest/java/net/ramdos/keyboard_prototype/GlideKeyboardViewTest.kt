@@ -101,7 +101,7 @@ class GlideKeyboardViewTest {
         val originalHeight = keyboard.height
         toggle.performClick()
         layout()
-        layout() // Columns adapt to the newly visible viewport width.
+        layout() // Rows adapt to the newly visible viewport width.
         assertEquals(originalHeight, keyboard.height)
         assertEquals(View.INVISIBLE, board.visibility)
         val scroll = keyboard.findViewById<android.widget.ScrollView>(R.id.expanded_candidates_scroll)
@@ -118,6 +118,37 @@ class GlideKeyboardViewTest {
         assertEquals("候補40", selection)
         assertEquals(View.VISIBLE, board.visibility)
         assertEquals(View.GONE, scroll.visibility)
+    }
+
+    @Test
+    fun expandedCandidatesPackNaturalWidthsAndWrapLongText() = withKeyboard { keyboard, _ ->
+        val candidates = listOf("一", "二", "三", "四", "少し長い候補", "とても長い候補の全文を省略せずに折り返して表示する".repeat(3), "最後")
+        keyboard.showCandidates(candidates)
+        fun layout() {
+            keyboard.measure(View.MeasureSpec.makeMeasureSpec(1100, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            keyboard.layout(0, 0, keyboard.measuredWidth, keyboard.measuredHeight)
+        }
+        layout()
+        keyboard.findViewById<Button>(R.id.expand_candidates_key).performClick()
+        repeat(3) { layout() }
+        val rows = keyboard.findViewById<android.widget.LinearLayout>(R.id.expanded_candidates_rows)
+        val firstRow = rows.getChildAt(0) as ViewGroup
+        assertTrue(firstRow.childCount >= 4)
+        val buttons = (0 until rows.childCount).flatMap { index ->
+            val row = rows.getChildAt(index) as ViewGroup
+            (0 until row.childCount).map { childIndex ->
+                val button = row.getChildAt(childIndex) as Button
+                assertTrue(button.right <= row.width)
+                if (childIndex > 0) assertEquals(row.getChildAt(childIndex - 1).right, button.left)
+                button
+            }
+        }
+        assertEquals(candidates, buttons.map { it.text.toString() })
+        assertTrue(buttons[0].width < buttons[4].width)
+        assertTrue(buttons[5].lineCount > 1)
+        val minimum = (48 * keyboard.resources.displayMetrics.density).toInt()
+        buttons.forEach { assertTrue(it.width >= minimum && it.height >= minimum) }
     }
 
     @Test
