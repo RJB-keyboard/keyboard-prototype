@@ -38,7 +38,7 @@ class GlideDecoderTest {
 
     @Test
     fun returnToTheSameKeyCanRepeatWithoutEmittingTheTurnaroundKey() {
-        val decoder = GlideDecoder(geometry, RecordingModel(), GlideDecoderConfig(languageWeight = 0.0))
+        val decoder = GlideDecoder(geometry, RecordingModel(), GlideDecoderConfig(languageWeight = 0.0, maxRepeatedCharactersPerEvent = 1))
         val candidates = decoder.decode(trace(point(0, 0, 0), point(1, 0, 60), point(0, 0, 120)))
         assertTrue(candidates.any { it.reading == "なな" })
         assertEquals("なにな", candidates.first().reading)
@@ -47,7 +47,8 @@ class GlideDecoderTest {
     @Test
     fun loopInsideOneKeyCanRepeatButStationaryHoldDoesNot() {
         val singleKey = listOf(key('な', 0, 0))
-        val decoder = GlideDecoder(geometry, RecordingModel(), GlideDecoderConfig(languageWeight = 0.0))
+        // Isolate repetition evidenced by geometry from optional decoder completion.
+        val decoder = GlideDecoder(geometry, RecordingModel(), GlideDecoderConfig(languageWeight = 0.0, maxRepeatedCharactersPerEvent = 1))
         val loop = GlideTrace(listOf(
             point(0, 0, 0), TracePoint(0.2375f, 0.125f, 50), point(0, 0, 100),
         ), singleKey)
@@ -62,7 +63,7 @@ class GlideDecoderTest {
         val model = RecordingModel { _, prefix ->
             distribution(if (prefix.isEmpty()) 'が' else 'ゃ')
         }
-        val decoder = GlideDecoder(geometry, model, GlideDecoderConfig(languageWeight = 1.0))
+        val decoder = GlideDecoder(geometry, model, GlideDecoderConfig(languageWeight = 1.0, maxRepeatedCharactersPerEvent = 1))
         val candidates = decoder.decode(GlideTrace(listOf(point(0, 0, 0), point(1, 0, 60)), baseKeys))
         assertEquals("がゃ", candidates.first().reading)
         assertTrue(candidates.any { it.reading == "かや" })
@@ -102,7 +103,7 @@ class GlideDecoderTest {
     @Test
     fun repeatedAlignmentPathsAreMarginalizedInsteadOfReturnedAsDuplicates() {
         val model = RecordingModel()
-        val decoder = GlideDecoder(geometry, model, GlideDecoderConfig(languageWeight = 0.0))
+        val decoder = GlideDecoder(geometry, model, GlideDecoderConfig(languageWeight = 0.0, maxRepeatedCharactersPerEvent = 1))
         val trace = trace(point(0, 0, 0), point(1, 0, 50), point(0, 0, 100), point(1, 0, 150), point(2, 0, 200))
         val result = decoder.decode(trace)
         assertEquals(result.size, result.map { it.reading }.toSet().size)
@@ -120,8 +121,8 @@ class GlideDecoderTest {
     @Test
     fun optionalInsertionBonusCanCompensateLanguageLengthBias() {
         val trace = trace(point(0, 0, 0), point(2, 0, 100))
-        val noBonus = GlideDecoder(geometry, RecordingModel(), GlideDecoderConfig(languageWeight = 1.0)).decode(trace)
-        val withBonus = GlideDecoder(geometry, RecordingModel(), GlideDecoderConfig(languageWeight = 1.0, characterInsertionBonus = 6.0)).decode(trace)
+        val noBonus = GlideDecoder(geometry, RecordingModel(), GlideDecoderConfig(languageWeight = 1.0, maxRepeatedCharactersPerEvent = 1)).decode(trace)
+        val withBonus = GlideDecoder(geometry, RecordingModel(), GlideDecoderConfig(languageWeight = 1.0, characterInsertionBonus = 6.0, maxRepeatedCharactersPerEvent = 1)).decode(trace)
         assertEquals("なぬ", noBonus.first().reading)
         assertEquals("なにぬ", withBonus.first().reading)
         withBonus.forEach {

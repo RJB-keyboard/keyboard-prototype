@@ -77,7 +77,7 @@ class GlideCandidateEngineTest {
         val lm = object : KanaLanguageModel {
             override fun nextLogProbabilities(context: String, prefixes: List<String>): List<Map<Char, Double>> {
                 observedContext = context
-                return prefixes.map { mapOf('あ' to 0.0) }
+                return prefixes.map { if (it.isEmpty()) mapOf('あ' to 0.0) else emptyMap() }
             }
             override fun close() { modelClosed = true }
         }

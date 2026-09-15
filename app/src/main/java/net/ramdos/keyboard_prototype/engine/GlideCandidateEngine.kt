@@ -69,6 +69,8 @@ class GlideCandidateEngine(
             if (text != null && selected.size < maxCandidates) selected += text
         }
         reserve(readings.first().reading)
+        // Omitted repeats must remain selectable as kana even if their conversion is poor.
+        readings.filter { it.hasImplicitRepetition }.forEach { reserve(it.reading) }
         // Preserve one distinct alternative reading when there is room, even outside
         // the competitive preview window. The preview pass below determines display order.
         reserve(ordered.firstOrNull { it.readingIndex != ranked.first().readingIndex && it.text !in selected }?.text)
