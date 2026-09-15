@@ -26,11 +26,16 @@ class GlideCandidateEngine(
         }
         // Keep several interpretations accessible; preserve the converter's own ranking.
         val result = linkedSetOf<String>()
-        choices.take(if (maxCandidates > 1) maxCandidates - 1 else 1).forEach {
+        // Repetition alternatives may convert to unrelated kanji fragments. Keep
+        // their literal readings reachable alongside the best ordinary reading.
+        val literalReadings = (listOfNotNull(readings.firstOrNull()?.reading) +
+            readings.filter { it.hasImplicitRepetition }.map { it.reading }).distinct()
+            .take((maxCandidates - 1).coerceAtLeast(0))
+        choices.take(maxCandidates - literalReadings.size).forEach {
             it.firstOrNull()?.let(result::add)
         }
         // Reserve space for the best literal reading even if conversion has many alternatives.
-        if (result.size < maxCandidates) readings.firstOrNull()?.reading?.let(result::add)
+        literalReadings.forEach { if (result.size < maxCandidates) result.add(it) }
         if (result.size == maxCandidates) return result.toList()
         for (rank in 1 until (choices.maxOfOrNull { it.size } ?: 0)) {
             for (variants in choices) {

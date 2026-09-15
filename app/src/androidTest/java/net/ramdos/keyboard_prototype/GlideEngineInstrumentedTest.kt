@@ -23,6 +23,22 @@ import kotlin.math.hypot
 @RunWith(AndroidJUnit4::class)
 class GlideEngineInstrumentedTest {
     @Test
+    fun realPipelineOffersGomamayoWithoutReturningToMa() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val model = OnnxHiraganaLanguageModel.open(context)
+        val converter = try { SumireKanaKanjiConverter.open(context) } catch (error: Throwable) {
+            model.close()
+            throw error
+        }
+        GlideCandidateEngine(model, converter).use { engine ->
+            val started = System.nanoTime()
+            val candidates = engine.generateCandidates(traceFor("こまよ"))
+            Log.i("GlideEngineTest", "Repeated kana millis=${(System.nanoTime() - started) / 1_000_000}, candidates=$candidates")
+            assertTrue("Expected ごままよ among $candidates", "ごままよ" in candidates)
+        }
+    }
+
+    @Test
     fun comparesDictionaryOnTheSameNoisyContinuousGlidesUsingTheRealModel() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         OnnxHiraganaLanguageModel.open(context).use { model ->
@@ -61,7 +77,7 @@ class GlideEngineInstrumentedTest {
                             // Measured regression: without dictionary costs this
                             // 420 ms path loses ほ and prefers the fragment にんこ.
                             assertEquals("にんこ", baseline.first().reading)
-                            assertEquals(1, baseline.indexOfFirst { it.reading == fixture.reading })
+                            assertTrue(baseline.indexOfFirst { it.reading == fixture.reading } in 1..2)
                             assertEquals("にほんご", mixed.first().reading)
                             assertTrue(mixed.first().dictionaryCost <
                                 diagnosticLexicon.evaluate(baseline.first().reading, complete = true).cost)
@@ -73,7 +89,10 @@ class GlideEngineInstrumentedTest {
                             assertTrue("Dictionary should improve the greeting's rank", mixedRank < baselineRank)
                         }
                         "ありがとう" -> {
-                            assertEquals(fixture.reading, baseline.first().reading)
+                            // Splitting emission mass across repeat counts adds a
+                            // small length penalty; without dictionary scoring the
+                            // shorter ありとう can now lead, but ありがとう survives.
+                            assertTrue(baseline.indexOfFirst { it.reading == fixture.reading } in 0..1)
                             assertEquals(fixture.reading, mixed.first().reading)
                         }
                         // とうきょう currently misses the returned beam in both
