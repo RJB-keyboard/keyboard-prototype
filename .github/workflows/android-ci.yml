@@ -2,6 +2,9 @@ name: Android CI
 
 on:
   push:
+    # Feature branches are checked by pull_request to avoid duplicate runs.
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -13,10 +16,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Unit tests, lint and build
+  checks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - name: Unit tests
+            id: unit-tests
+            tasks: :app:testDebugUnitTest
+          - name: Android Lint
+            id: lint
+            tasks: :app:lintDebug
+          - name: Build debug APKs
+            id: build
+            tasks: :app:assembleDebug :app:assembleDebugAndroidTest
     steps:
       - name: Check out sources
         uses: actions/checkout@v7
@@ -42,19 +59,31 @@ jobs:
 
       # JVM tests use the bundled dictionary and do not need model.onnx.
       # Compile device tests here; running them needs a device and the model.
-      - name: Run checks and build debug APKs
+      - name: Run ${{ matrix.name }}
         run: >-
           ./gradlew --no-daemon --console=plain --stacktrace --continue
-          :app:testDebugUnitTest :app:lintDebug
-          :app:assembleDebug :app:assembleDebugAndroidTest
+          ${{ matrix.tasks }}
 
       - name: Upload test and lint reports
-        if: always()
+        if: always() && matrix.id != 'build'
         uses: actions/upload-artifact@v7
         with:
-          name: android-check-reports
+          name: android-check-reports-${{ matrix.id }}
           path: |
             app/build/reports/
             app/build/test-results/testDebugUnitTest/
           retention-days: 14
           if-no-files-found: warn
+
+  # Keep the existing check name for branch protection rules.
+  check:
+    name: Unit tests, lint and build
+    needs: checks
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify all checks passed
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+        run: test "$CHECKS_RESULT" = success
