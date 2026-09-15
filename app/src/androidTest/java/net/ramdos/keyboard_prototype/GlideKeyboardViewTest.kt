@@ -228,7 +228,7 @@ class GlideKeyboardViewTest {
             val event = MotionEvent.obtain(100, 120, action, key.width / 2f + dx, key.height / 2f + dy, 0)
             try { assertTrue(key.dispatchTouchEvent(event)) } finally { event.recycle() }
         }
-        val expected = listOf("、", "？", "。", "...", "！", "。", "！")
+        val expected = listOf("、", "？", "。", "…", "！", "。", "！")
         val offsets = listOf(0f to 0f, distance to 0f, -distance to 0f, 0f to distance,
             0f to -distance, -distance to distance / 2, distance / 2 to -distance)
         for ((index, offset) in offsets.withIndex()) {
@@ -298,31 +298,6 @@ class GlideKeyboardViewTest {
         assertEquals(3, requests[1].points.size)
         assertEquals(47, requests[1].keys.size)
         assertEquals(listOf("あ", "い"), StubCandidateEngine().generateCandidates(requests[1]))
-    }
-
-    @Test
-    fun keyboardSwitchAndPickerCancelTraceWithoutCommittingCandidates() = withKeyboard { keyboard, board ->
-        var switches = 0
-        var pickers = 0
-        var commits = 0
-        var traces = 0
-        keyboard.onSwitchKeyboard = { switches++ }
-        keyboard.onChooseKeyboard = { pickers++ }
-        keyboard.onCandidateSelected = { commits++ }
-        keyboard.onTraceCompleted = { traces++ }
-        val key = keyboard.findViewById<Button>(R.id.switch_keyboard_key)
-        for (longPress in listOf(false, true)) {
-            touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
-            keyboard.showCandidates(listOf("未確定"))
-            if (longPress) assertTrue(key.performLongClick()) else key.performClick()
-            assertEquals(0, keyboard.findViewById<ViewGroup>(R.id.candidate_row).childCount)
-            touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
-        }
-        assertEquals(1, switches)
-        assertEquals(1, pickers)
-        assertEquals(0, commits)
-        assertEquals(0, traces)
-        assertTrue(key.bottom <= keyboard.findViewById<View>(R.id.backspace_key).top)
     }
 
     @Test
@@ -475,7 +450,7 @@ class GlideKeyboardViewTest {
         assertTrue(row.getChildAt(0).bottom <= row.getChildAt(1).top)
         keyboard.setEnterLabel(keyboard.context.getString(R.string.enter_newline))
         val enter = keyboard.findViewById<Button>(R.id.enter_key)
-        assertEquals("改行", enter.text.toString())
+        assertEquals("↵", enter.text.toString())
         assertEquals("改行", enter.contentDescription.toString())
     }
 

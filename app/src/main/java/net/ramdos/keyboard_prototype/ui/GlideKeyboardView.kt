@@ -38,8 +38,6 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     var onCursorLeft: (() -> Unit)? = null
     var onCursorRight: (() -> Unit)? = null
     var onBackspace: (() -> Unit)? = null
-    var onSwitchKeyboard: (() -> Unit)? = null
-    var onChooseKeyboard: (() -> Unit)? = null
 
     private val board: GojuonBoardView
     private val candidateRow: CandidateRowsView
@@ -65,7 +63,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         override fun run() {
             if (!backspaceHeld) return
             backspaceKey.performClick()
-            if (backspaceHeld) repeatHandler.postDelayed(this, 80L)
+            if (backspaceHeld) repeatHandler.postDelayed(this, 50L)
         }
     }
 
@@ -104,18 +102,6 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             }
         }
         bindBackspaceKey()
-        findViewById<Button>(R.id.switch_keyboard_key).apply {
-            setOnClickListener {
-                reset()
-                onSwitchKeyboard?.invoke()
-            }
-            setOnLongClickListener {
-                reset()
-                onChooseKeyboard?.invoke()
-                true
-            }
-        }
-
         findViewById<Button>(R.id.enter_key).setOnClickListener {
             reset()
             onEnter?.invoke()
@@ -166,7 +152,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             return if (kotlin.math.abs(dx) >= kotlin.math.abs(dy)) {
                 if (dx < 0) "。" else "？"
             } else {
-                if (dy < 0) "！" else "..."
+                if (dy < 0) "！" else "…"
             }
         }
         fun commit(symbol: String) {
@@ -179,7 +165,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             R.string.punctuation_full_stop to "。",
             R.string.punctuation_exclamation to "！",
             R.string.punctuation_question to "？",
-            R.string.punctuation_dots to "...",
+            R.string.punctuation_dots to "…",
         )) {
             ViewCompat.addAccessibilityAction(
                 punctuationKey, context.getString(label),
@@ -256,7 +242,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
                     backspaceHeld = true
                     view.isPressed = true
                     view.performClick()
-                    if (backspaceHeld) repeatHandler.postDelayed(repeatBackspace, 400L)
+                    if (backspaceHeld) repeatHandler.postDelayed(repeatBackspace, 600L)
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (event.x < 0 || event.x >= view.width ||
@@ -300,7 +286,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
                 val density = resources.displayMetrics.density
                 minWidth = (48 * density).toInt()
                 minimumWidth = minWidth
-                minHeight = (48 * density).toInt()
+                minHeight = resources.getDimensionPixelSize(R.dimen.candidate_row_height)
                 minimumHeight = minHeight
                 setPadding((4 * density).toInt(), 0, (4 * density).toInt(), 0)
                 setSingleLine(true)
@@ -328,6 +314,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         if (candidatesExpanded) {
             expandedScroll.layoutParams = expandedScroll.layoutParams.apply {
                 height = resources.getDimensionPixelSize(R.dimen.gojuon_board_height) +
+                    resources.getDimensionPixelSize(R.dimen.candidate_panel_height) -
                     (48 * resources.displayMetrics.density).toInt()
             }
             board.clearTrace()
@@ -359,7 +346,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
                 includeFontPadding = false
                 minWidth = (48 * density).toInt()
                 minimumWidth = minWidth
-                minHeight = (48 * density).toInt()
+                minHeight = resources.getDimensionPixelSize(R.dimen.candidate_row_height)
                 minimumHeight = minHeight
                 setPadding((4 * density).toInt(), (2 * density).toInt(),
                     (4 * density).toInt(), (2 * density).toInt())
@@ -390,7 +377,9 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
 
     fun setEnterLabel(label: CharSequence) {
         findViewById<Button>(R.id.enter_key).apply {
-            text = label
+            val newline = label.toString() == context.getString(R.string.enter_newline)
+            text = if (newline) context.getString(R.string.enter_newline_symbol) else label
+            textSize = if (newline) 36f else 16f
             contentDescription = label
         }
     }

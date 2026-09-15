@@ -44,18 +44,26 @@ class BackspaceRepeatTest {
                 key.performClick()
                 assertEquals(2, deletions)
             }
-            SystemClock.sleep(550)
+            SystemClock.sleep(750)
             main { assertEquals(2, deletions) }
         } finally { main { keyboard.reset() } }
     }
     @Test fun holdRepeatsAndReleaseDoesNotDeleteAgain() {
         setup()
         try {
-            main { touch(MotionEvent.ACTION_DOWN) }
-            SystemClock.sleep(650)
+            val times = mutableListOf<Long>()
+            main {
+                keyboard.onBackspace = { deletions++; times.add(SystemClock.uptimeMillis()) }
+                touch(MotionEvent.ACTION_DOWN)
+            }
+            SystemClock.sleep(900)
             var count = 0
             main {
                 assertTrue("A hold must repeat", deletions >= 3)
+                assertTrue("Wait 600ms before the second deletion", times[1] - times[0] >= 600)
+                val repeatIntervals = times.drop(1).zipWithNext { first, next -> next - first }
+                assertTrue("Continuous deletion should be faster than the previous 80ms interval",
+                    repeatIntervals.average() < 80)
                 count = deletions
                 touch(MotionEvent.ACTION_UP)
                 assertEquals(count, deletions)
@@ -85,7 +93,7 @@ class BackspaceRepeatTest {
                     touch(MotionEvent.ACTION_UP)
                     assertFalse(key.isPressed)
                 }
-                SystemClock.sleep(550)
+                SystemClock.sleep(750)
                 main { assertEquals(count, deletions) }
             }
         } finally { main { keyboard.reset() } }
@@ -100,7 +108,7 @@ class BackspaceRepeatTest {
                 }
                 touch(MotionEvent.ACTION_DOWN)
             }
-            SystemClock.sleep(700)
+            SystemClock.sleep(850)
             main { assertEquals(2, deletions) }
         } finally { main { keyboard.reset() } }
     }
@@ -118,7 +126,7 @@ class BackspaceRepeatTest {
                 assertEquals(1, deletions)
                 assertTrue(key.isPressed)
             }
-            SystemClock.sleep(650)
+            SystemClock.sleep(900)
             var count = 0
             main {
                 assertTrue("Selection updates must not stop a hold", deletions >= 3)
@@ -126,7 +134,7 @@ class BackspaceRepeatTest {
                 touch(MotionEvent.ACTION_UP)
                 assertFalse(key.isPressed)
             }
-            SystemClock.sleep(550)
+            SystemClock.sleep(750)
             main { assertEquals(count, deletions) }
         } finally { main { keyboard.reset() } }
     }
