@@ -41,7 +41,7 @@ JapaneseInputMethodService → InputConnection.commitText
 | 非同期処理 | `engine/CandidateSession.kt` | 推論の直列実行、中断、古い結果の破棄、リソース解放 |
 | IME接続 | `JapaneseInputMethodService.kt` | フロントとエンジンの接続、入力先への確定、セッションのリセット |
 
-Kotlinファイルは [app/src/main/java/net/ramdos/keyboard_prototype/](../app/src/main/java/net/ramdos/keyboard_prototype/) 以下にあります。
+Kotlinファイルは [app/src/main/java/net/ramdos/keyboard_prototype/](../app/src/main/java/net/ramdos/keyboard_prototype) 以下にあります。
 
 ## 軌跡と候補の契約
 

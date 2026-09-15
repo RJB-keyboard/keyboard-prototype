@@ -10,7 +10,7 @@ class NearbyKanaTest {
     private val keys = "あいうえなかきくけ".mapIndexed { index, kana ->
         key(kana, index % 3, index / 3)
     } + key('こ', 4, 1)
-    private val trace = GlideTrace(listOf(point(1, 1, 0), point(4, 1, 120)), keys)
+    private val trace = GlideTrace(listOf(point(1, 0), point(4, 120)), keys)
     private val uniform = object : KanaLanguageModel {
         override fun nextLogProbabilities(context: String, prefixes: List<String>) =
             prefixes.map { ('\u3041'..'\u3096').associateWith { ln(1.0 / 86) } }
@@ -55,20 +55,20 @@ class NearbyKanaTest {
         val tolerant = GlideDecoder(languageModel = model).decode(trace)
         assertEquals("なこ", strict.first().reading)
         assertEquals("えこ", tolerant.first().reading)
-        val held = trace.copy(points = listOf(point(1, 1, 0), point(1, 1, 180), point(4, 1, 300)))
+        val held = trace.copy(points = listOf(point(1, 0), point(1, 180), point(4, 300)))
         assertEquals("なこ", GlideDecoder(languageModel = model).decode(held).first().reading)
-        val tap = trace.copy(points = listOf(point(1, 1, 0)))
+        val tap = trace.copy(points = listOf(point(1, 0)))
         assertEquals("な", GlideDecoder(languageModel = model).decode(tap).first().reading)
     }
 
     @Test
     fun uninformativeLanguageStillPrefersTracedKeysWithoutExtraCharacters() {
         assertEquals("なこ", GlideDecoder(languageModel = uniform).decode(trace).first().reading)
-        val tap = trace.copy(points = listOf(point(1, 1, 0), point(1, 1, 1000)))
+        val tap = trace.copy(points = listOf(point(1, 0), point(1, 1000)))
         assertEquals("な", GlideDecoder(languageModel = uniform).decode(tap).first().reading)
     }
 
     private fun key(kana: Char, x: Int, y: Int) =
         KanaKey(kana.toString(), x / 8f, y / 8f, (x + 1) / 8f, (y + 1) / 8f)
-    private fun point(x: Int, y: Int, time: Long) = TracePoint((x + 0.5f) / 8f, (y + 0.5f) / 8f, time)
+    private fun point(x: Int, time: Long) = TracePoint((x + 0.5f) / 8f, 1.5f / 8f, time)
 }
