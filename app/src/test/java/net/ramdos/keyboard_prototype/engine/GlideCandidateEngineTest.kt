@@ -210,6 +210,33 @@ class GlideCandidateEngineTest {
         }
     }
 
+    @Test
+    fun confidenceUsesScoresDespitePreviewOrderAndSurvivesDisplayLimit() {
+        val readings = listOf(reading("あ", -10000.0), reading("い", -10001.0))
+        val variants = mapOf("あ" to listOf(ConversionCandidate("亜", 0.0)))
+        rankingEngine(variants).use { engine ->
+            val candidates = engine.rankScoredCandidates(readings)
+            assertEquals(listOf("亜", "い", "あ"), candidates.map { it.text })
+            val byText = candidates.associateBy { it.text }
+            assertEquals(1.0, candidates.sumOf { requireNotNull(it.confidence) }, 1e-12)
+            assertEquals(byText.getValue("亜").confidence, byText.getValue("あ").confidence)
+            assertTrue(byText.getValue("い").confidence!! < byText.getValue("あ").confidence!!)
+            rankingEngine(variants, limit = 1).use { limited ->
+                assertEquals(listOf(candidates.first()), limited.rankScoredCandidates(readings))
+            }
+        }
+    }
+
+    @Test
+    fun confidenceDeduplicatesSurfacesAndHandlesSingleEmptyAndExtremeScores() {
+        rankingEngine(mapOf("あ" to listOf(ConversionCandidate("あ", 0.0)))).use { engine ->
+            assertTrue(engine.rankScoredCandidates(emptyList()).isEmpty())
+            assertEquals(listOf(DisplayCandidate("あ", 1.0)), engine.rankScoredCandidates(listOf(reading("あ", 0.0))))
+            val candidates = engine.rankScoredCandidates(listOf(reading("あ", 0.0), reading("い", -10000.0)))
+            assertEquals(listOf(DisplayCandidate("あ", 1.0), DisplayCandidate("い", 0.0)), candidates)
+        }
+    }
+
     private fun reading(text: String, score: Double) = ReadingCandidate(text, score, 0.0, score, 0.0)
 
     private fun rankingEngine(

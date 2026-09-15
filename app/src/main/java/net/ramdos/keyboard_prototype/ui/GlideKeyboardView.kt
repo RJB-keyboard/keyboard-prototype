@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Canvas
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
+import androidx.core.graphics.ColorUtils
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
@@ -20,6 +23,7 @@ import android.widget.ScrollView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import net.ramdos.keyboard_prototype.R
+import net.ramdos.keyboard_prototype.engine.DisplayCandidate
 import net.ramdos.keyboard_prototype.engine.GlideTrace
 
 /** Frontend API: emit a trace, display supplied candidates, emit a selection. */
@@ -44,7 +48,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     private val expandedScroll: ScrollView
     private val expandedRows: LinearLayout
     private val expandKey: Button
-    private var displayedCandidates: List<String> = emptyList()
+    private var displayedCandidates: List<DisplayCandidate> = emptyList()
     private var candidatesExpanded = false
 
     private var punctuationHeld = false
@@ -262,7 +266,20 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         }
     }
 
-    fun showCandidates(candidates: List<String>) {
+    fun showCandidates(candidates: List<String>) =
+        showScoredCandidates(candidates.map { DisplayCandidate(it) })
+
+    private fun Button.applyCandidateBackground(candidate: DisplayCandidate) {
+        backgroundTintList = null
+        setBackgroundResource(R.drawable.candidate_background)
+        val layers = background.mutate() as LayerDrawable
+        val fill = layers.findDrawableByLayerId(R.id.candidate_fill) as GradientDrawable
+        fill.setColor(candidate.confidence?.let {
+            ColorUtils.blendARGB(Color.rgb(227, 242, 253), Color.rgb(200, 230, 201), it.toFloat())
+        } ?: Color.WHITE)
+    }
+
+    fun showScoredCandidates(candidates: List<DisplayCandidate>) {
         setCandidatesExpanded(false)
         displayedCandidates = candidates.toList()
         expandedRows.removeAllViews()
@@ -273,7 +290,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         candidateScroll.visibility = if (candidates.isEmpty()) View.GONE else View.VISIBLE
         candidates.forEach { candidate ->
             candidateRow.addView(Button(context).apply {
-                text = candidate
+                text = candidate.text
                 textSize = 22f
                 gravity = Gravity.CENTER
                 includeFontPadding = false
@@ -286,10 +303,9 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
                 setSingleLine(true)
                 isAllCaps = false
                 setTextColor(Color.rgb(23, 33, 46))
-                backgroundTintList = null
-                setBackgroundResource(R.drawable.candidate_background)
-                contentDescription = context.getString(R.string.commit_candidate, candidate)
-                setOnClickListener { onCandidateSelected?.invoke(candidate) }
+                applyCandidateBackground(candidate)
+                contentDescription = context.getString(R.string.commit_candidate, candidate.text)
+                setOnClickListener { onCandidateSelected?.invoke(candidate.text) }
             })
         }
         candidateScroll.scrollTo(0, 0)
@@ -325,7 +341,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             val row = LinearLayout(context).apply { orientation = HORIZONTAL }
             candidates.forEach { candidate ->
                 row.addView(Button(context).apply {
-                    text = candidate
+                    text = candidate.text
                     textSize = 20f
                     isAllCaps = false
                     gravity = Gravity.CENTER
@@ -336,11 +352,11 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
                     setPadding((4 * density).toInt(), (6 * density).toInt(),
                         (4 * density).toInt(), (6 * density).toInt())
                     setTextColor(Color.rgb(23, 33, 46))
-                    backgroundTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
-                    contentDescription = context.getString(R.string.commit_candidate, candidate)
+                    applyCandidateBackground(candidate)
+                    contentDescription = context.getString(R.string.commit_candidate, candidate.text)
                     setOnClickListener {
                         setCandidatesExpanded(false)
-                        onCandidateSelected?.invoke(candidate)
+                        onCandidateSelected?.invoke(candidate.text)
                     }
                 }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
             }

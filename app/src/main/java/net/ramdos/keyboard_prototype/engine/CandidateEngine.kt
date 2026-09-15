@@ -19,12 +19,22 @@ data class KanaKey(
 /** One completed gesture, including the key geometry used when it was recorded. */
 data class GlideTrace(val points: List<TracePoint>, val keys: List<KanaKey>)
 
+/** Relative support among generated surfaces, not calibrated correctness; null if unavailable. */
+data class DisplayCandidate(val text: String, val confidence: Double? = null) {
+    init {
+        require(confidence == null || confidence.isFinite() && confidence in 0.0..1.0)
+    }
+}
+
 /** Android-independent boundary. Production inference runs on a background worker. */
 fun interface CandidateEngine : AutoCloseable {
     fun generateCandidates(trace: GlideTrace): List<String>
 
     fun generateCandidates(trace: GlideTrace, precedingText: String): List<String> =
         generateCandidates(trace)
+
+    fun generateScoredCandidates(trace: GlideTrace, precedingText: String): List<DisplayCandidate> =
+        generateCandidates(trace, precedingText).map { DisplayCandidate(it) }
 
     /** May be invoked by the UI while generation is running. Must be thread-safe. */
     fun cancelPendingInference() {}
