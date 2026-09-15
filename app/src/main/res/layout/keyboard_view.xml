@@ -11,14 +11,14 @@
             android:orientation="vertical">
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="96dp"
+                android:layout_height="@dimen/candidate_panel_height"
                 android:paddingStart="4dp"
                 android:paddingEnd="4dp">
                 <FrameLayout
                     android:id="@+id/compact_candidates"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:layout_marginEnd="100dp">
+                    android:layout_marginEnd="58dp">
                     <TextView
                         android:id="@+id/candidate_hint"
                         android:layout_width="match_parent"
@@ -45,35 +45,19 @@
                 <Button
                     android:id="@+id/expand_candidates_key"
                     android:layout_width="48dp"
-                    android:layout_height="48dp"
+                    android:layout_height="@dimen/candidate_row_height"
                     android:layout_gravity="top|end"
-                    android:layout_marginEnd="50dp"
                     android:minWidth="0dp"
                     android:padding="0dp"
                     android:text="@string/expand_candidates_key"
                     android:contentDescription="@string/expand_candidates"
-                    android:backgroundTint="#D7E7FF"
+                    android:backgroundTint="#DDE1E6"
                     android:textColor="#17212E"
                     android:visibility="gone" />
                 <Button
-                    android:id="@+id/switch_keyboard_key"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_gravity="top|end"
-                    android:minWidth="0dp"
-                    android:paddingStart="0dp"
-                    android:paddingEnd="0dp"
-                    android:singleLine="true"
-                    android:backgroundTint="#D7E7FF"
-                    android:contentDescription="@string/switch_keyboard_description"
-                    android:text="@string/switch_keyboard_key"
-                    android:textAllCaps="false"
-                    android:textColor="#17212E"
-                    android:textSize="14sp" />
-                <Button
                     android:id="@+id/backspace_key"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
+                    android:layout_width="56dp"
+                    android:layout_height="@dimen/candidate_row_height"
                     android:layout_gravity="bottom|end"
                     android:minWidth="0dp"
                     android:gravity="center"
@@ -84,12 +68,12 @@
                     android:paddingEnd="4dp"
                     android:singleLine="true"
                     android:ellipsize="end"
-                    android:backgroundTint="#FFFFFF"
+                    android:backgroundTint="#DDE1E6"
                     android:contentDescription="@string/backspace_description"
                     android:text="@string/backspace_key"
                     android:textAllCaps="false"
                     android:textColor="#17212E"
-                    android:textSize="16sp" />
+                    android:textSize="24sp" />
             </FrameLayout>
             <net.ramdos.keyboard_prototype.ui.GojuonBoardView
                 android:id="@+id/gojuon_board"
@@ -152,7 +136,7 @@
             android:paddingEnd="4dp"
             android:singleLine="true"
             android:ellipsize="end"
-            android:backgroundTint="#FFFFFF"
+            android:backgroundTint="#DDE1E6"
             android:contentDescription="@string/cursor_left_description"
             android:text="@string/cursor_left_key"
             android:textAllCaps="false"
@@ -172,13 +156,13 @@
             android:paddingEnd="4dp"
             android:singleLine="true"
             android:ellipsize="end"
-            android:backgroundTint="#FFFFFF"
+            android:backgroundTint="#DDE1E6"
             android:contentDescription="@string/punctuation_description"
             android:text="@string/punctuation_key"
             android:textAllCaps="false"
             android:textColor="#17212E"
             android:textSize="20sp" />
-        <Button
+        <net.ramdos.keyboard_prototype.ui.RaisedSymbolButton
             android:id="@+id/space_key"
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -192,13 +176,13 @@
             android:paddingEnd="4dp"
             android:singleLine="true"
             android:ellipsize="end"
-            android:backgroundTint="#FFFFFF"
+            android:backgroundTint="#DDE1E6"
             android:contentDescription="@string/space_description"
             android:text="@string/space_key"
             android:textAllCaps="false"
             android:textColor="#17212E"
-            android:textSize="16sp" />
-        <Button
+            android:textSize="36sp" />
+        <net.ramdos.keyboard_prototype.ui.RaisedSymbolButton
             android:id="@+id/enter_key"
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -212,12 +196,13 @@
             android:paddingEnd="4dp"
             android:singleLine="true"
             android:ellipsize="end"
-            android:backgroundTint="#FFFFFF"
+            android:backgroundTint="#DDE1E6"
             android:contentDescription="@string/enter_newline"
-            android:text="@string/enter_newline"
+            android:text="@string/enter_newline_symbol"
+            android:textScaleX="1.6"
             android:textAllCaps="false"
             android:textColor="#17212E"
-            android:textSize="16sp" />
+            android:textSize="36sp" />
         <Button
             android:id="@+id/cursor_right_key"
             android:layout_width="0dp"
@@ -232,7 +217,7 @@
             android:paddingEnd="4dp"
             android:singleLine="true"
             android:ellipsize="end"
-            android:backgroundTint="#FFFFFF"
+            android:backgroundTint="#DDE1E6"
             android:contentDescription="@string/cursor_right_description"
             android:text="@string/cursor_right_key"
             android:textAllCaps="false"

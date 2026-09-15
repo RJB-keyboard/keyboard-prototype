@@ -38,6 +38,47 @@ class GlideKeyboardViewTest {
         }
     }
 
+    @Test
+    fun actionSymbolsAreVisibleAndClickable() {
+        val scenario = androidx.test.core.app.ActivityScenario.launch(MainActivity::class.java)
+        try {
+            lateinit var keyboard: GlideKeyboardView
+            var deleted = 0
+            var spaced = 0
+            var entered = 0
+            scenario.onActivity { activity ->
+                keyboard = GlideKeyboardView(ContextThemeWrapper(instrumentation.targetContext, android.R.style.Theme_InputMethod))
+                keyboard.onBackspace = { deleted++ }
+                keyboard.onSpace = { spaced++ }
+                keyboard.onEnter = { entered++ }
+                activity.setContentView(keyboard)
+            }
+            instrumentation.waitForIdleSync()
+            android.os.SystemClock.sleep(250) // Wait for the attached view to reach the display.
+            val screenshot = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+            scenario.onActivity {
+                for (id in listOf(R.id.backspace_key, R.id.space_key, R.id.enter_key)) {
+                    val key = keyboard.findViewById<Button>(id)
+                    assertTrue(key.isShown)
+                    assertTrue(key.width > 0 && key.height > 0)
+                    val location = IntArray(2)
+                    key.getLocationOnScreen(location)
+                    var inkPixels = 0
+                    for (y in 0 until key.height) for (x in 0 until key.width) {
+                        val color = screenshot.getPixel(location[0] + x, location[1] + y)
+                        if (Color.alpha(color) > 200 && Color.red(color) < 90 && Color.green(color) < 90 && Color.blue(color) < 90) inkPixels++
+                    }
+                    assertTrue("${key.contentDescription} must visibly draw its symbol; ink=$inkPixels", inkPixels > 20)
+                    key.performClick()
+                }
+                assertEquals(1, deleted)
+                assertEquals(1, spaced)
+                assertEquals(1, entered)
+            }
+            screenshot.recycle()
+        } finally { scenario.close() }
+    }
+
     private fun touch(board: GojuonBoardView, action: Int, x: Float, y: Float, time: Long) {
         val event = MotionEvent.obtain(100, time, action, x * board.width, y * board.height, 0)
         try {
@@ -148,7 +189,8 @@ class GlideKeyboardViewTest {
         assertTrue(buttons[0].width < buttons[4].width)
         assertTrue(buttons[5].lineCount > 1)
         val minimum = (48 * keyboard.resources.displayMetrics.density).toInt()
-        buttons.forEach { assertTrue(it.width >= minimum && it.height >= minimum) }
+        val minimumHeight = keyboard.resources.getDimensionPixelSize(R.dimen.candidate_row_height)
+        buttons.forEach { assertTrue(it.width >= minimum && it.height >= minimumHeight) }
     }
 
     @Test
@@ -228,7 +270,7 @@ class GlideKeyboardViewTest {
             val event = MotionEvent.obtain(100, 120, action, key.width / 2f + dx, key.height / 2f + dy, 0)
             try { assertTrue(key.dispatchTouchEvent(event)) } finally { event.recycle() }
         }
-        val expected = listOf("、", "？", "。", "...", "！", "。", "！")
+        val expected = listOf("、", "？", "。", "…", "！", "。", "！")
         val offsets = listOf(0f to 0f, distance to 0f, -distance to 0f, 0f to distance,
             0f to -distance, -distance to distance / 2, distance / 2 to -distance)
         for ((index, offset) in offsets.withIndex()) {
@@ -298,31 +340,6 @@ class GlideKeyboardViewTest {
         assertEquals(3, requests[1].points.size)
         assertEquals(47, requests[1].keys.size)
         assertEquals(listOf("あ", "い"), StubCandidateEngine().generateCandidates(requests[1]))
-    }
-
-    @Test
-    fun keyboardSwitchAndPickerCancelTraceWithoutCommittingCandidates() = withKeyboard { keyboard, board ->
-        var switches = 0
-        var pickers = 0
-        var commits = 0
-        var traces = 0
-        keyboard.onSwitchKeyboard = { switches++ }
-        keyboard.onChooseKeyboard = { pickers++ }
-        keyboard.onCandidateSelected = { commits++ }
-        keyboard.onTraceCompleted = { traces++ }
-        val key = keyboard.findViewById<Button>(R.id.switch_keyboard_key)
-        for (longPress in listOf(false, true)) {
-            touch(board, MotionEvent.ACTION_DOWN, 0.95f, 0.1f, 100)
-            keyboard.showCandidates(listOf("未確定"))
-            if (longPress) assertTrue(key.performLongClick()) else key.performClick()
-            assertEquals(0, keyboard.findViewById<ViewGroup>(R.id.candidate_row).childCount)
-            touch(board, MotionEvent.ACTION_UP, 0.95f, 0.1f, 120)
-        }
-        assertEquals(1, switches)
-        assertEquals(1, pickers)
-        assertEquals(0, commits)
-        assertEquals(0, traces)
-        assertTrue(key.bottom <= keyboard.findViewById<View>(R.id.backspace_key).top)
     }
 
     @Test
@@ -475,7 +492,7 @@ class GlideKeyboardViewTest {
         assertTrue(row.getChildAt(0).bottom <= row.getChildAt(1).top)
         keyboard.setEnterLabel(keyboard.context.getString(R.string.enter_newline))
         val enter = keyboard.findViewById<Button>(R.id.enter_key)
-        assertEquals("改行", enter.text.toString())
+        assertEquals("↵", enter.text.toString())
         assertEquals("改行", enter.contentDescription.toString())
     }
 

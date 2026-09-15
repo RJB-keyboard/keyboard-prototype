@@ -10,7 +10,7 @@ class PunctuationFlickGuide(private val density: Float, private val scaledDensit
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cells = listOf(
         Triple("、", 1, 1), Triple("。", 0, 1), Triple("！", 1, 0),
-        Triple("？", 2, 1), Triple("...", 1, 2),
+        Triple("？", 2, 1), Triple("…", 1, 2),
     )
 
     fun draw(canvas: Canvas, left: Float, top: Float, cellSize: Float, selected: String) {

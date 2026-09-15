@@ -10,7 +10,7 @@ class CandidateRowsView(context: Context, attrs: AttributeSet? = null) : ViewGro
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val widths = intArrayOf(0, 0)
-        var rowHeight = (48 * resources.displayMetrics.density).toInt()
+        var rowHeight = resources.getDimensionPixelSize(net.ramdos.keyboard_prototype.R.dimen.candidate_row_height)
         for (index in 0 until childCount) {
             val child = getChildAt(index)
             child.measure(
