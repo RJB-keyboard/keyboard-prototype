@@ -46,6 +46,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     private val expandKey: Button
     private var displayedCandidates: List<String> = emptyList()
     private var candidatesExpanded = false
+    private var expandedCandidateWidth = 0
 
     private var punctuationHeld = false
     private lateinit var punctuationKey: Button
@@ -93,8 +94,10 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         expandedRows = findViewById(R.id.expanded_candidates_rows)
         expandKey = findViewById(R.id.expand_candidates_key)
         expandKey.setOnClickListener { setCandidatesExpanded(!candidatesExpanded) }
-        expandedScroll.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
-            if (candidatesExpanded && right - left != oldRight - oldLeft) renderExpandedCandidates()
+        expandedScroll.addOnLayoutChangeListener { _, left, _, right, _, _, _, _, _ ->
+            if (candidatesExpanded && right - left - expandedScroll.paddingLeft - expandedScroll.paddingRight != expandedCandidateWidth) {
+                renderExpandedCandidates()
+            }
         }
         bindBackspaceKey()
         findViewById<Button>(R.id.switch_keyboard_key).apply {
@@ -274,7 +277,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
         candidates.forEach { candidate ->
             candidateRow.addView(Button(context).apply {
                 text = candidate
-                textSize = 22f
+                textSize = 20f
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 val density = resources.displayMetrics.density
@@ -282,7 +285,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
                 minimumWidth = minWidth
                 minHeight = (48 * density).toInt()
                 minimumHeight = minHeight
-                setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
+                setPadding((4 * density).toInt(), 0, (4 * density).toInt(), 0)
                 setSingleLine(true)
                 isAllCaps = false
                 setTextColor(Color.rgb(23, 33, 46))
@@ -319,37 +322,55 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
 
     private fun renderExpandedCandidates() {
         val density = resources.displayMetrics.density
-        val columns = (expandedScroll.width / (112 * density)).toInt().coerceIn(1, 4)
+        val margins = expandedScroll.layoutParams as android.view.ViewGroup.MarginLayoutParams
+        val viewportWidth = expandedScroll.width.takeIf { it > 0 }
+            ?: ((expandedScroll.parent as View).width - margins.leftMargin - margins.rightMargin)
+        val availableWidth = viewportWidth - expandedScroll.paddingLeft - expandedScroll.paddingRight
+        expandedCandidateWidth = availableWidth
         expandedRows.removeAllViews()
-        displayedCandidates.chunked(columns).forEach { candidates ->
-            val row = LinearLayout(context).apply { orientation = HORIZONTAL }
-            candidates.forEach { candidate ->
-                row.addView(Button(context).apply {
-                    text = candidate
-                    textSize = 20f
-                    isAllCaps = false
-                    gravity = Gravity.CENTER
-                    includeFontPadding = false
-                    minWidth = 0
-                    minimumWidth = 0
-                    minHeight = (48 * density).toInt()
-                    setPadding((4 * density).toInt(), (6 * density).toInt(),
-                        (4 * density).toInt(), (6 * density).toInt())
-                    setTextColor(Color.rgb(23, 33, 46))
-                    backgroundTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
-                    contentDescription = context.getString(R.string.commit_candidate, candidate)
-                    setOnClickListener {
-                        setCandidatesExpanded(false)
-                        onCandidateSelected?.invoke(candidate)
-                    }
-                }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-            }
-            // Keep the final row's cells aligned with the preceding rows.
-            repeat(columns - candidates.size) {
-                row.addView(View(context), LayoutParams(0, 0, 1f))
-            }
+        if (availableWidth <= 0) return // Rebuilt when the visible viewport is laid out.
+        var row = LinearLayout(context).apply { orientation = HORIZONTAL }
+        var usedWidth = 0
+        fun appendRow() {
             expandedRows.addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         }
+        displayedCandidates.forEach { candidate ->
+            val button = Button(context).apply {
+                text = candidate
+                textSize = 18f
+                isAllCaps = false
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                minWidth = (48 * density).toInt()
+                minimumWidth = minWidth
+                minHeight = (48 * density).toInt()
+                minimumHeight = minHeight
+                setPadding((4 * density).toInt(), (2 * density).toInt(),
+                    (4 * density).toInt(), (2 * density).toInt())
+                setTextColor(Color.rgb(23, 33, 46))
+                backgroundTintList = null
+                setBackgroundResource(R.drawable.candidate_background)
+                contentDescription = context.getString(R.string.commit_candidate, candidate)
+                setOnClickListener {
+                    setCandidatesExpanded(false)
+                    onCandidateSelected?.invoke(candidate)
+                }
+            }
+            // Natural widths pack short candidates tightly; long text wraps within the viewport.
+            button.measure(
+                View.MeasureSpec.makeMeasureSpec(availableWidth, View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            )
+            val width = button.measuredWidth
+            if (row.childCount > 0 && usedWidth + width > availableWidth) {
+                appendRow()
+                row = LinearLayout(context).apply { orientation = HORIZONTAL }
+                usedWidth = 0
+            }
+            row.addView(button, LayoutParams(width, LayoutParams.WRAP_CONTENT))
+            usedWidth += width
+        }
+        if (row.childCount > 0) appendRow()
     }
 
     fun setEnterLabel(label: CharSequence) {
