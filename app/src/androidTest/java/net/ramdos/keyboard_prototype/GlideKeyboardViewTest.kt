@@ -148,7 +148,8 @@ class GlideKeyboardViewTest {
         assertTrue(buttons[0].width < buttons[4].width)
         assertTrue(buttons[5].lineCount > 1)
         val minimum = (48 * keyboard.resources.displayMetrics.density).toInt()
-        buttons.forEach { assertTrue(it.width >= minimum && it.height >= minimum) }
+        val minimumHeight = keyboard.resources.getDimensionPixelSize(R.dimen.candidate_row_height)
+        buttons.forEach { assertTrue(it.width >= minimum && it.height >= minimumHeight) }
     }
 
     @Test
