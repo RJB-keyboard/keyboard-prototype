@@ -179,7 +179,7 @@
             android:text="@string/enter_newline"
             android:textAllCaps="false"
             android:textColor="#17212E"
-            android:textSize="24sp" />
+            android:textSize="16sp" />
         <Button
             android:id="@+id/cursor_right_key"
             android:layout_width="0dp"

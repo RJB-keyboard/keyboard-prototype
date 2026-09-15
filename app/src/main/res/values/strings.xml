@@ -26,7 +26,8 @@
     <string name="enter_previous">前へ</string>
     <string name="enter_done">完了</string>
     <string name="punctuation_key">、。</string>
-    <string name="punctuation_description">句読点を選んで入力</string>
+    <string name="punctuation_full_stop">「。」を入力</string>
+    <string name="punctuation_description">タップで「、」、フリックで「。」を入力</string>
     <string name="space_key">スペース</string>
     <string name="space_description">半角スペースを入力</string>
     <string name="cursor_left_key">‹</string>

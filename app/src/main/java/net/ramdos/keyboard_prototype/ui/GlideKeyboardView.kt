@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import android.view.LayoutInflater
 import android.view.Gravity
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.Button
 import android.widget.GridLayout
 import android.widget.HorizontalScrollView
@@ -38,6 +39,9 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
     private val candidateRow: GridLayout
     private val candidateScroll: HorizontalScrollView
     private val hint: TextView
+
+    private var punctuationHeld = false
+    private lateinit var punctuationKey: Button
 
     private val repeatHandler = Handler(Looper.getMainLooper())
     private var backspaceHeld = false
@@ -93,11 +97,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             onEnter?.invoke()
         }
 
-        findViewById<Button>(R.id.punctuation_key).setOnClickListener {
-            reset()
-            onPunctuation?.invoke()
-            showCandidates(listOf("、", "。"))
-        }
+        bindPunctuationKey()
 
         findViewById<Button>(R.id.space_key).setOnClickListener {
             reset()
@@ -123,6 +123,66 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
             showCandidates(emptyList())
         }
         board.onTraceCompleted = { onTraceCompleted?.invoke(it) }
+    }
+
+    // A tap enters a comma; a flick in any direction enters a full stop.
+    @SuppressLint("ClickableViewAccessibility")
+    private fun bindPunctuationKey() {
+        punctuationKey = findViewById(R.id.punctuation_key)
+        val threshold = maxOf(
+            ViewConfiguration.get(context).scaledTouchSlop.toFloat(),
+            16 * resources.displayMetrics.density,
+        )
+        var startX = 0f
+        var startY = 0f
+        fun symbol(event: MotionEvent): String {
+            val dx = event.x - startX
+            val dy = event.y - startY
+            return if (dx * dx + dy * dy >= threshold * threshold) "。" else "、"
+        }
+        fun commit(symbol: String) {
+            reset()
+            onPunctuation?.invoke()
+            onCandidateSelected?.invoke(symbol)
+        }
+        punctuationKey.setOnClickListener { commit("、") }
+        ViewCompat.addAccessibilityAction(
+            punctuationKey, context.getString(R.string.punctuation_full_stop),
+        ) { _, _ -> commit("。"); true }
+        punctuationKey.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    reset()
+                    onPunctuation?.invoke()
+                    startX = event.x
+                    startY = event.y
+                    punctuationHeld = true
+                    view.isPressed = true
+                    punctuationKey.text = "、"
+                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_MOVE -> if (punctuationHeld) {
+                    punctuationKey.text = symbol(event)
+                }
+                MotionEvent.ACTION_UP -> if (punctuationHeld) {
+                    val selected = symbol(event)
+                    stopPunctuationGesture()
+                    if (selected == "、") view.performClick() else commit(selected)
+                }
+                MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN,
+                MotionEvent.ACTION_POINTER_UP -> stopPunctuationGesture()
+            }
+            true
+        }
+    }
+
+    private fun stopPunctuationGesture() {
+        punctuationHeld = false
+        if (::punctuationKey.isInitialized) {
+            punctuationKey.isPressed = false
+            punctuationKey.setText(R.string.punctuation_key)
+            punctuationKey.parent?.requestDisallowInterceptTouchEvent(false)
+        }
     }
 
     // Button already implements performClick; touch and accessibility share its click listener.
@@ -196,12 +256,16 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
 
     override fun onDetachedFromWindow() {
         stopBackspaceRepeat()
+        stopPunctuationGesture()
         super.onDetachedFromWindow()
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
-        if (visibility != View.VISIBLE && ::backspaceKey.isInitialized) stopBackspaceRepeat()
+        if (visibility != View.VISIBLE) {
+            if (::backspaceKey.isInitialized) stopBackspaceRepeat()
+            stopPunctuationGesture()
+        }
     }
 
     fun reset() {
@@ -211,6 +275,7 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
 
     /** Selection updates also follow our own deletions; keep an active key hold. */
     fun clearPendingInput() {
+        stopPunctuationGesture()
         board.clearTrace()
         showCandidates(emptyList())
     }

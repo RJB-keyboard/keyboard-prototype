@@ -44,6 +44,49 @@ class GlideKeyboardViewTest {
     }
 
     @Test
+    fun punctuationTapAndFlickCommitOnReleaseAndCanBeCancelled() = withKeyboard { keyboard, _ ->
+        val key = keyboard.findViewById<Button>(R.id.punctuation_key)
+        val selections = mutableListOf<String>()
+        keyboard.onCandidateSelected = { selections.add(it); keyboard.reset() }
+        val distance = 40 * keyboard.resources.displayMetrics.density
+        fun send(action: Int, dx: Float = 0f, dy: Float = 0f) {
+            val event = MotionEvent.obtain(100, 120, action, key.width / 2f + dx, key.height / 2f + dy, 0)
+            try { assertTrue(key.dispatchTouchEvent(event)) } finally { event.recycle() }
+        }
+        for ((dx, dy) in listOf(0f to 0f, distance to 0f, -distance to 0f, 0f to distance, 0f to -distance)) {
+            val before = selections.size
+            keyboard.showCandidates(listOf("未確定"))
+            send(MotionEvent.ACTION_DOWN)
+            send(MotionEvent.ACTION_MOVE, dx, dy)
+            assertEquals(before, selections.size)
+            assertEquals(0, keyboard.findViewById<GridLayout>(R.id.candidate_row).childCount)
+            assertEquals(if (dx == 0f && dy == 0f) "、" else "。", key.text.toString())
+            send(MotionEvent.ACTION_UP, dx, dy)
+            assertEquals(before + 1, selections.size)
+            assertFalse(key.isPressed)
+        }
+        assertEquals(listOf("、", "。", "。", "。", "。"), selections)
+        for (cancel in listOf<() -> Unit>(
+            { send(MotionEvent.ACTION_CANCEL) },
+            { send(MotionEvent.ACTION_POINTER_DOWN) },
+            { keyboard.reset() },
+        )) {
+            send(MotionEvent.ACTION_DOWN)
+            send(MotionEvent.ACTION_MOVE, distance)
+            cancel()
+            send(MotionEvent.ACTION_UP, distance)
+        }
+        assertEquals(5, selections.size)
+        send(MotionEvent.ACTION_DOWN)
+        send(MotionEvent.ACTION_MOVE, distance)
+        send(MotionEvent.ACTION_UP, 1f, 1f)
+        assertEquals("、", selections.last())
+        key.performClick()
+        assertEquals(7, selections.size)
+        assertEquals("、", selections.last())
+    }
+
+    @Test
     fun tapAndGlideUseAnInterchangeableEngineAndCommitOnlyOnCandidateClick() = withKeyboard { keyboard, board ->
         val requests = mutableListOf<GlideTrace>()
         val selections = mutableListOf<String>()
