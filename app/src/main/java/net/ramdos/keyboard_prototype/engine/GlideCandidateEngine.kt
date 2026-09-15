@@ -20,8 +20,8 @@ class GlideCandidateEngine(
         val readings = decoder.decode(trace, context)
         val choices = readings.map { candidate ->
             checkCancellation()
-            // Keep a dictionary-unknown reading literal instead of dressing it up as spurious kanji.
-            val converted = if (candidate.unknownCharacters > 0) emptyList() else converter.convert(candidate.reading, 3)
+            // Convert known spans even when the reading contains unknown kana; retain the literal below.
+            val converted = converter.convert(candidate.reading, 3)
             (converted.filter { it.isNotBlank() } + candidate.reading).distinct()
         }
         // Keep several interpretations accessible; preserve the converter's own ranking.
