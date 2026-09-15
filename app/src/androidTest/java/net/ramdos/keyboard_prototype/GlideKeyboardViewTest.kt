@@ -101,6 +101,52 @@ class GlideKeyboardViewTest {
     }
 
     @Test
+    fun punctuationGuideAppearsTracksDirectionAndDisappears() = withKeyboard { keyboard, _ ->
+        val key = keyboard.findViewById<Button>(R.id.punctuation_key)
+        val distance = 40 * keyboard.resources.displayMetrics.density
+        fun send(action: Int, dx: Float = 0f) {
+            val event = MotionEvent.obtain(100, 120, action, key.width / 2f + dx, key.height / 2f, 0)
+            try { key.dispatchTouchEvent(event) } finally { event.recycle() }
+        }
+        fun render() = android.graphics.Bitmap.createBitmap(keyboard.width, keyboard.height,
+            android.graphics.Bitmap.Config.ARGB_8888).also { keyboard.draw(android.graphics.Canvas(it)) }
+        fun blueCenter(bitmap: android.graphics.Bitmap): Float? {
+            var total = 0L
+            var count = 0
+            for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) {
+                if (bitmap.getPixel(x, y) == android.graphics.Color.rgb(0, 112, 240)) {
+                    total += x
+                    count++
+                }
+            }
+            return if (count == 0) null else total.toFloat() / count
+        }
+        val idle = render()
+        assertNull(blueCenter(idle))
+        idle.recycle()
+        send(MotionEvent.ACTION_DOWN)
+        val center = render()
+        val centerX = requireNotNull(blueCenter(center))
+        center.recycle()
+        send(MotionEvent.ACTION_MOVE, distance)
+        val right = render()
+        assertTrue(requireNotNull(blueCenter(right)) > centerX)
+        java.io.File(instrumentation.targetContext.cacheDir, "punctuation-guide.png").outputStream().use {
+            right.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+        right.recycle()
+        send(MotionEvent.ACTION_UP, distance)
+        val released = render()
+        assertNull(blueCenter(released))
+        released.recycle()
+        send(MotionEvent.ACTION_DOWN)
+        send(MotionEvent.ACTION_CANCEL)
+        val cancelled = render()
+        assertNull(blueCenter(cancelled))
+        cancelled.recycle()
+    }
+
+    @Test
     fun punctuationTapAndFlickCommitOnReleaseAndCanBeCancelled() = withKeyboard { keyboard, _ ->
         val key = keyboard.findViewById<Button>(R.id.punctuation_key)
         val selections = mutableListOf<String>()

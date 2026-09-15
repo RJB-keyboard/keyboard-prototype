@@ -3,6 +3,8 @@ package net.ramdos.keyboard_prototype.ui
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
@@ -47,6 +49,9 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
 
     private var punctuationHeld = false
     private lateinit var punctuationKey: Button
+    private val punctuationGuide = PunctuationFlickGuide(
+        resources.displayMetrics.density, resources.displayMetrics.scaledDensity,
+    )
 
     private val repeatHandler = Handler(Looper.getMainLooper())
     private var backspaceHeld = false
@@ -183,10 +188,12 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
                     punctuationHeld = true
                     view.isPressed = true
                     punctuationKey.text = "、"
+                    invalidate()
                     view.parent?.requestDisallowInterceptTouchEvent(true)
                 }
                 MotionEvent.ACTION_MOVE -> if (punctuationHeld) {
                     punctuationKey.text = symbol(event)
+                    invalidate()
                 }
                 MotionEvent.ACTION_UP -> if (punctuationHeld) {
                     val selected = symbol(event)
@@ -202,11 +209,29 @@ class GlideKeyboardView(context: Context) : LinearLayout(context) {
 
     private fun stopPunctuationGesture() {
         punctuationHeld = false
+        invalidate()
         if (::punctuationKey.isInitialized) {
             punctuationKey.isPressed = false
             punctuationKey.setText(R.string.punctuation_key)
             punctuationKey.parent?.requestDisallowInterceptTouchEvent(false)
         }
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        if (!punctuationHeld) return
+        val keyBounds = Rect()
+        punctuationKey.getDrawingRect(keyBounds)
+        offsetDescendantRectToMyCoords(punctuationKey, keyBounds)
+        val density = resources.displayMetrics.density
+        val cellSize = minOf(48 * density, (width - paddingLeft - paddingRight) / 3f)
+        if (cellSize <= 0) return
+        // Keep all five directions above the finger and out of the OS navigation band.
+        val left = (keyBounds.exactCenterX() - cellSize * 1.5f).coerceIn(
+            paddingLeft.toFloat(), maxOf(paddingLeft.toFloat(), width - paddingRight - cellSize * 3),
+        )
+        val top = maxOf(paddingTop.toFloat(), keyBounds.top - 6 * density - cellSize * 3)
+        punctuationGuide.draw(canvas, left, top, cellSize, punctuationKey.text.toString())
     }
 
     // Button already implements performClick; touch and accessibility share its click listener.
